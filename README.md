@@ -1,6 +1,6 @@
 # Signal–Noise Alignment in IBL Brain-Wide Map Visual Cortex Data
 
-This repository analyzes the geometry between stimulus signal axes and dominant residual/noise covariance modes in International Brain Laboratory (IBL) Neuropixels recordings, focusing initially on visual cortex populations such as VISp / VIS.
+This repository analyzes the geometry between stimulus signal axes and dominant residual/noise covariance modes in International Brain Laboratory (IBL) Neuropixels recordings, focusing initially on visual cortex populations such as VISp.
 
 The current scope is **alignment baseline only**. Decoding analyses, noise ablation, and signal-to-noise prediction are promising follow-up directions, but they are intentionally not part of the first clean baseline pipeline.
 
@@ -8,7 +8,7 @@ The current scope is **alignment baseline only**. Decoding analyses, noise ablat
 
 ## 1. Dataset
 
-We use the public IBL Brain-Wide Map (BWM) dataset, a large-scale Neuropixels dataset collected across multiple laboratories while mice performed the IBL visual decision-making task.
+We use the public IBL Brain-Wide Map dataset, a large-scale Neuropixels dataset collected across multiple laboratories while mice performed the IBL visual decision-making task.
 
 According to the IBL 2025 Brain Wide Map release page, the released dataset contains hundreds of Neuropixels sessions and probe insertions across many subjects and labs. The release is associated with the public tag:
 
@@ -27,7 +27,7 @@ Useful IBL documentation:
 
 ## 2. Environment setup
 
-Create a clean Python environment. On the RCC / Midway cluster, use your preferred Conda setup. Example:
+Create a clean Python environment. Example:
 
 ```bash
 conda create -n ibl python=3.12
@@ -72,7 +72,7 @@ ONE.setup(
 one = ONE(
     base_url="https://openalyx.internationalbrainlab.org",
     password="international",
-    cache_dir="/scratch/midway3/<username>/ONE",  # change this
+    cache_dir="/your/path/to/ONE",  # change this
 )
 ```
 
@@ -152,26 +152,6 @@ contrast_left = trials["contrastLeft"]
 contrast_right = trials["contrastRight"]
 ```
 
-We define signed contrast as:
-
-```python
-signed = contrast_left - contrast_right
-```
-
-The current baseline analysis focuses on high-contrast, nonzero trials:
-
-```python
-thresh = 0.5
-is_zero = (contrast_left == 0) & (contrast_right == 0)
-high_mask = (~is_zero) & (abs(signed) > thresh)
-pos_mask = high_mask & (signed > 0)
-neg_mask = high_mask & (signed < 0)
-```
-
-This should be treated as an explicit analysis choice, not an implicit default. Later control analyses should repeat the alignment calculation under different contrast subsets.
-
----
-
 ## 6. Loading spikes and clusters
 
 For spike sorting data, use `SpikeSortingLoader`:
@@ -199,9 +179,9 @@ clusters["cluster_id"]
 
 ---
 
-## 7. Selecting VIS / VISp recordings
+## 7. Selecting VISp recordings
 
-The project currently uses a precomputed session list, generated upstream by `load_subjects_VISp.py` and saved as something like:
+The project currently uses a precomputed session list, generated upstream by `load_subjects_VISp.py` and saved as:
 
 ```text
 VISp_subjects_by_lab.json
@@ -213,35 +193,7 @@ The downstream alignment code expects this JSON to contain entries like:
 lab -> subject -> VIS_eids
 ```
 
-The current helper function reads this file and builds a flat list of session IDs:
-
-```python
-def build_eids_from_results(json_path="VISp_subjects_by_lab.json"):
-    results = load_results(json_path)
-    eids = []
-    for lab_name in results.keys():
-        for subject in results[lab_name].keys():
-            eids.extend(results[lab_name][subject]["VIS_eids"])
-    return eids
-```
-
-Within each session, the current analysis chooses the probe insertion with the largest number of units whose Allen acronym starts with the target prefix, usually:
-
-```python
-target_prefix = "VIS"
-```
-
-This means the default region filter includes visual cortex acronyms beginning with `VIS`, not only strict `VISp`, unless the code is configured otherwise.
-
-Conceptually:
-
-```python
-acr = clusters["acronym"]
-region_mask = [a.startswith("VIS") for a in acr]
-region_cluster_ids = clusters["cluster_id"][region_mask]
-```
-
-For a stricter VISp-only analysis, change the region rule to exact or prefix matching for `VISp`.
+For a stricter VISp-only analysis, change the region rule within each session to exact or prefix matching for `VISp`.
 
 ---
 
@@ -508,39 +460,3 @@ Before interpreting alignment, check and report:
 This checklist is important because alignment values depend strongly on effective dimensionality, trial subset, contrast threshold, and time-bin size.
 
 ---
-
-## 14. Current project scope
-
-Current baseline question:
-
-```text
-Are stimulus signal axes preferentially aligned with dominant residual covariance modes in visual cortex populations, relative to random high-dimensional geometry?
-```
-
-Current null model:
-
-```text
-The signal axis has no privileged orientation relative to the top-k noise eigenspace.
-Expected top-k overlap under this null is k / N.
-```
-
-Current main metrics:
-
-```text
-top1_cos
-top1_cos²
-topk_overlap
-topk_overlap - k/N
-random-subspace z-score
-```
-
-Later extensions:
-
-```text
-contrast-specific signal axes
-contrast-specific noise covariance
-spontaneous/passive covariance comparison
-bin-size robustness
-signal-to-noise or noise-to-signal prediction
-decoder performance and ablation
-```
