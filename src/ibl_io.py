@@ -1,3 +1,4 @@
+# ibl_io.py
 from one.api import ONE
 from iblatlas.atlas import AllenAtlas as ba
 from brainbox.io.one import SpikeSortingLoader
@@ -17,7 +18,7 @@ def one_setup(cache_dir: str):
         )
     return one
 
-def build_eid_from_results(json_path: str):
+def build_eids_from_results(json_path: str):
     eids=[]
     with open(json_path, 'r') as f:
         results = json.load(f)
@@ -29,11 +30,9 @@ def build_eid_from_results(json_path: str):
 
 def load_trials(one, eid:str):
     trials = one.load_object(eid, 'trials', collection='alf')
-
-    stim_on = np.asarray(trials['stimOn_tims'])
+    stim_on = np.asarray(trials['stimOn_times'])
     stim_off = np.asarray(trials['stimOff_times'])
-
-    valid = (~np.isnan(stim_on) & (~np.isnan(stim_off)))
+    valid = (~np.isnan(stim_on)) & (~np.isnan(stim_off))
     num_trials = len(stim_on)
     for k in list(trials.keys()):
         v = np.asarray(trials[k])

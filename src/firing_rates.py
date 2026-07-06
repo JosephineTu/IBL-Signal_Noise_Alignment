@@ -1,3 +1,4 @@
+# firing_rates.py
 import numpy as np
 from brainbox.population.decode import get_spike_counts_in_bins
 
@@ -22,7 +23,7 @@ def compute_static_firing_rates(spikes, stim_on, stim_off, region_cluster_ids, e
     return fr, unit_ids
 
 def make_time_windows(t_start, t_end, bin_size, step_size):
-    starts = np.arange(t_start, t_end - bin_size + step_size, step_size)
+    starts = np.arange(t_start, t_end - bin_size, step_size)
     ends = starts + bin_size
     if len(starts) < 1:
         raise ValueError("No time windows can be created with the given parameters.")
