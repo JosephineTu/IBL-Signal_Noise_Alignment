@@ -70,8 +70,8 @@ def condition_noise_subspaces(X, condition_masks, k=3, min_trials=10, eps=1e-12)
     R, condition_means, residual_mask = noise_residuals_by_condition(X, condition_masks)
     noise_subspace_similarities = {}
     for cond_a, cond_b in combinations(condition_masks.keys(), 2):
-        mask_a = condition_masks[cond_a]
-        mask_b = condition_masks[cond_b]
+        mask_a = condition_masks[cond_a] & residual_mask
+        mask_b = condition_masks[cond_b] & residual_mask
         if np.sum(mask_a) < min_trials or np.sum(mask_b) < min_trials:
             continue
         C_a = compute_noise_covariance(R, mask_a)
@@ -86,12 +86,13 @@ def condition_noise_subspaces(X, condition_masks, k=3, min_trials=10, eps=1e-12)
     trial_counts = {cond: int(np.sum(mask)) for cond, mask in condition_masks.items()}
     return noise_subspace_similarities, mean_similarity, min_similarity, trial_counts
 
-def random_subspace_similarity(X, condition_masks, k=3, n_iter=100, eps=1e-12):
+def random_subspace_similarity(X, condition_masks, k=3, n_iter=100, eps=1e-12, seed=0):
+    rng = np.random.default_rng(seed)
     similarities=[]
     R, _, residual_mask = noise_residuals_by_condition(X, condition_masks)
     valid_idx = np.flatnonzero(residual_mask)
     for i in range(n_iter):
-        idx = np.random.choice(valid_idx, size=X.shape[0]//3, replace=False)
+        idx = rng.choice(valid_idx, size=X.shape[0]//3, replace=False)
         mask_1 = np.zeros(X.shape[0], dtype=bool)
         mask_2 = np.zeros(X.shape[0], dtype=bool)
         half = len(idx) // 2
@@ -103,7 +104,15 @@ def random_subspace_similarity(X, condition_masks, k=3, n_iter=100, eps=1e-12):
         U_2, _ = top_noise_subspace(C_2, k=k)
         similarity = subspace_similarity(U_1, U_2, eps=eps)
         similarities.append(similarity)
-    return np.mean(similarities)
+    similarities = np.asarray(similarities, float)
+    
+    return{
+        'samples': similarities,
+        'mean': float(np.nanmean(similarities)),
+        'std': float(np.nanstd(similarities)),
+        'p05': float(np.nanpercentile(similarities, 5)),
+        'p95': float(np.nanpercentile(similarities, 95)),
+    }
 
 def compute_cosine_similarity(u1, u2):
     u1 = np.asarray(u1, float)
