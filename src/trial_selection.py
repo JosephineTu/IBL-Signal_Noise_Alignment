@@ -39,7 +39,7 @@ def get_high_masks(signed_contrast, min_trials=5, threshold=0.5):
     else: 
         return high_mask
     
-def get_pos_neg_masks(signed_contrast, high_mask=None, min_trials = 5):
+def get_pos_neg_masks(signed_contrast, high_mask=None, min_trials=5):
     if high_mask is not None:
         pos_mask = high_mask & (signed_contrast > 0)
         if np.sum(pos_mask) < min_trials:
