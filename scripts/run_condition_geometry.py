@@ -29,7 +29,7 @@ def signal_manifold_overlap(X, condition_masks, pos_mask, neg_mask, n_components
 
 def compute_signal_axis_pair_similarity(X, trials, u_sig, min_trials=5, eps=1e-12):
     axes = am.compute_contrast_pair_axes(X, trials, eps=eps)
-    out_pairwise, out_global = am.summarize_contrast_pair(axes, u_sig, eps=eps)
+    out_pairwise, out_global = am.summarize_contrast_pair_axes(axes, u_sig, eps=eps)
     return out_pairwise, out_global
 
 def noise_subspace_similarity(X, condition_masks, k=3, eps=1e-12):
@@ -45,7 +45,7 @@ def noise_subspace_similarity(X, condition_masks, k=3, eps=1e-12):
 
 def main():
     one = ibl_io.one_setup(cache_dir="/scratch/midway3/xiaorantu/ONE")
-    data_path = Path('signal_noise_alignment/results/VISp_subjects_by_lab.json')
+    data_path = REPO_ROOT / "results" / "VISp_subjects_by_lab.json"
     eids = ibl_io.build_eids_from_results(data_path)
     eids_to_run = eids[:5]
     atlas = AllenAtlas()
@@ -133,5 +133,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
