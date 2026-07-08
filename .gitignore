@@ -1,5 +1,11 @@
-
 # Python cache
 __pycache__/
 *.py[cod]
 
+# Slurm / job logs
+*.out
+*.err
+*.sbatch
+
+# Pickle result files
+*.pkl
