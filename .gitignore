@@ -2,4 +2,4 @@
 # Python cache
 __pycache__/
 *.py[cod]
-scripts/run_condition_geometry.py
+
