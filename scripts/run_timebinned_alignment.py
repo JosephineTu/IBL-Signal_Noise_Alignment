@@ -79,7 +79,6 @@ def make_bin_tag(t_start, t_end, bin_size, step_size, k):
 
 def main():
     parser = argparse.ArgumentParser()
-
     parser.add_argument(
         "--cache-dir",
         default="/scratch/midway3/xiaorantu/ONE",
@@ -102,23 +101,18 @@ def main():
     parser.add_argument("--max-sessions", type=int, default=5)
     parser.add_argument("--session-index", type=int, default=None)
     args = parser.parse_args()
-
     one = ibl_io.one_setup(cache_dir=args.cache_dir)
     atlas = AllenAtlas()
     data_path = Path(args.data_path)
     eids = ibl_io.build_eids_from_results(data_path)
-
     if args.session_index is not None:
         eids_to_run = [eids[args.session_index]]
     else:
         eids_to_run = eids[: args.max_sessions]
-
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-
     all_rows = []
     details = {}
-
     for eid in eids_to_run:
         try:
             time_df, detail = run_one_eid(
@@ -134,13 +128,10 @@ def main():
                 min_trials=args.min_trials,
                 output_dir=output_dir,
             )
-
             all_rows.append(time_df)
             details[eid] = detail
-
         except Exception as exc:
             print(f"FAILED eid {eid}: {repr(exc)}")
-
             fail_row = pd.DataFrame(
                 [
                     {
@@ -151,9 +142,7 @@ def main():
                 ]
             )
             all_rows.append(fail_row)
-
     summary_df = pd.concat(all_rows, ignore_index=True)
-
     bin_tag = make_bin_tag(
         t_start=args.t_start,
         t_end=args.t_end,
@@ -161,18 +150,13 @@ def main():
         step_size=args.step_size,
         k=args.k,
     )
-
     summary_csv = output_dir / f"{bin_tag}_timebinned_alignment_summary.csv"
     details_pkl = output_dir / f"{bin_tag}_timebinned_alignment_details.pkl"
-
     summary_df.to_csv(summary_csv, index=False)
-
     with open(details_pkl, "wb") as f:
         pickle.dump(details, f)
-
     print(f"\nSaved summary to {summary_csv}")
     print(f"Saved details to {details_pkl}")
-
 if __name__ == "__main__":
     main()
 

@@ -1,4 +1,3 @@
-# plot_timebinned_alignment.py
 from __future__ import annotations
 
 import argparse
@@ -54,15 +53,9 @@ def plot_one_eid_alignment(eid, d, out_dir, tag):
     plt.close(fig)
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--summary-csv", required=True)
-    parser.add_argument("--out-dir", default="figures/figure5")
-    parser.add_argument("--tag", default=None)
-    args = parser.parse_args()
-
-    summary_csv = Path(args.summary_csv)
-    out_dir = Path(args.out_dir)
+def plot_one_summary(summary_csv, out_dir, tag=None):
+    summary_csv = Path(summary_csv)
+    out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     df = pd.read_csv(summary_csv)
@@ -84,17 +77,99 @@ def main():
     for c in ["time", "cosine2_top1", "expected_random_cosine2"]:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
-    df = df.dropna(subset=["eid", "time", "cosine2_top1", "expected_random_cosine2"])
+    df = df.dropna(
+        subset=[
+            "eid",
+            "time",
+            "cosine2_top1",
+            "expected_random_cosine2",
+        ]
+    )
 
-    if args.tag is None:
+    if tag is None:
         tag = summary_csv.stem.replace("_timebinned_alignment_summary", "")
-    else:
-        tag = args.tag
 
+    n_eids = 0
     for eid, d in df.groupby("eid", sort=False):
         plot_one_eid_alignment(eid, d, out_dir, tag)
+        n_eids += 1
 
-    print(f"Saved per-eid Figure 5 alignment plots to {out_dir}")
+    print(f"  saved {n_eids} eid plots to {out_dir}")
+
+
+def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--summary-csv",
+        default=None,
+        help="Single summary CSV. Kept for backward compatibility.",
+    )
+
+    parser.add_argument(
+        "--summary-glob",
+        default=None,
+        help='Glob for multiple summary CSVs, e.g. "results/*timebinned_alignment_summary.csv"',
+    )
+
+    parser.add_argument(
+        "--out-root",
+        default="figures",
+        help="Root directory. Multiple summaries will be saved as figure_5_1, figure_5_2, ...",
+    )
+
+    parser.add_argument(
+        "--out-dir",
+        default=None,
+        help="Output directory for single-summary mode.",
+    )
+
+    parser.add_argument(
+        "--tag",
+        default=None,
+        help="Optional tag. In multi-summary mode, default tag comes from each CSV stem.",
+    )
+
+    args = parser.parse_args()
+
+    if args.summary_glob is not None:
+        summary_files = sorted(Path(".").glob(args.summary_glob))
+
+        if len(summary_files) == 0:
+            raise RuntimeError(f"No files matched --summary-glob {args.summary_glob}")
+
+        out_root = Path(args.out_root)
+
+        print(f"Found {len(summary_files)} summary CSVs.")
+
+        for i, summary_csv in enumerate(summary_files, start=1):
+            out_dir = out_root / f"figure_5_{i}"
+
+            print(f"\n[{i}/{len(summary_files)}] {summary_csv}")
+            print(f"  out_dir = {out_dir}")
+
+            plot_one_summary(
+                summary_csv=summary_csv,
+                out_dir=out_dir,
+                tag=args.tag,
+            )
+
+    elif args.summary_csv is not None:
+        summary_csv = Path(args.summary_csv)
+
+        if args.out_dir is None:
+            out_dir = Path("figures/figure_5")
+        else:
+            out_dir = Path(args.out_dir)
+
+        plot_one_summary(
+            summary_csv=summary_csv,
+            out_dir=out_dir,
+            tag=args.tag,
+        )
+
+    else:
+        raise RuntimeError("Provide either --summary-csv or --summary-glob.")
 
 
 if __name__ == "__main__":
