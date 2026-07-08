@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.covariance import LedoitWolf
 from sklearn.decomposition import PCA
 from itertools import combinations
-from trial_selection import make_contrast_pair_condition_masks, get_pos_neg_masks
+from .trial_selection import make_contrast_pair_condition_masks, get_high_masks, get_pos_neg_masks
 
 def enforce_sym(C):
     C = np.asarray(C, dtype=float)
@@ -88,30 +88,37 @@ def condition_noise_subspaces(X, condition_masks, k=3, min_trials=10, eps=1e-12)
 
 def random_subspace_similarity(X, condition_masks, k=3, n_iter=100, eps=1e-12, seed=0):
     rng = np.random.default_rng(seed)
-    similarities=[]
     R, _, residual_mask = noise_residuals_by_condition(X, condition_masks)
     valid_idx = np.flatnonzero(residual_mask)
-    for i in range(n_iter):
-        idx = rng.choice(valid_idx, size=X.shape[0]//3, replace=False)
-        mask_1 = np.zeros(X.shape[0], dtype=bool)
-        mask_2 = np.zeros(X.shape[0], dtype=bool)
-        half = len(idx) // 2
-        mask_1[idx[:half]] = True
-        mask_2[idx[half:]] = True
-        C_1 = compute_noise_covariance(R, mask_1)
-        C_2 = compute_noise_covariance(R, mask_2)
-        U_1, _ = top_noise_subspace(C_1, k=k)
-        U_2, _ = top_noise_subspace(C_2, k=k)
-        similarity = subspace_similarity(U_1, U_2, eps=eps)
-        similarities.append(similarity)
-    similarities = np.asarray(similarities, float)
-    
-    return{
-        'samples': similarities,
-        'mean': float(np.nanmean(similarities)),
-        'std': float(np.nanstd(similarities)),
-        'p05': float(np.nanpercentile(similarities, 5)),
-        'p95': float(np.nanpercentile(similarities, 95)),
+    samples = []
+    cond_items = list(condition_masks.items())
+    for _ in range(n_iter):
+        sim_iter = []
+        for cond_a, mask_a_real in cond_items:
+            for cond_b, mask_b_real in cond_items:
+                if cond_a >= cond_b:
+                    continue
+                n_a = int(np.sum(mask_a_real & residual_mask))
+                n_b = int(np.sum(mask_b_real & residual_mask))
+                draw = rng.choice(valid_idx, size=n_a + n_b, replace=False)
+                mask_a = np.zeros(X.shape[0], dtype=bool)
+                mask_b = np.zeros(X.shape[0], dtype=bool)
+                mask_a[draw[:n_a]] = True
+                mask_b[draw[n_a:n_a + n_b]] = True
+                C_a = compute_noise_covariance(R, mask_a)
+                C_b = compute_noise_covariance(R, mask_b)
+                U_a, _ = top_noise_subspace(C_a, k=k)
+                U_b, _ = top_noise_subspace(C_b, k=k)
+                sim_iter.append(subspace_similarity(U_a, U_b, eps=eps))
+        if sim_iter:
+            samples.append(np.nanmean(sim_iter))
+    samples = np.asarray(samples, float)
+    return {
+        "samples": samples,
+        "mean": float(np.nanmean(samples)),
+        "std": float(np.nanstd(samples)),
+        "p05": float(np.nanpercentile(samples, 5)),
+        "p95": float(np.nanpercentile(samples, 95)),
     }
 
 def compute_cosine_similarity(u1, u2):
@@ -174,3 +181,36 @@ def summarize_contrast_pair_axes(axes, u_global, eps=1e-12):
             'abs_cosine_global': float(np.abs(cosine_global)),
         }
     return out_1, out_2
+
+def signal_noise_alignment(X, signed_contrast, k=3, min_trials=5, eps=1e-12):
+    X = np.asarray(X, float)
+    high_mask = get_high_masks(signed_contrast, min_trials=min_trials)
+    pos_mask, neg_mask = get_pos_neg_masks(signed_contrast, high_mask=high_mask, min_trials=min_trials)
+    u_sig = compute_signal_axis(X, pos_mask, neg_mask, min_trials=min_trials, eps=eps)
+    condition_masks = {
+        'pos': pos_mask,
+        'neg': neg_mask,
+    }
+    n_pos = int(np.sum(pos_mask))
+    n_neg = int(np.sum(neg_mask))
+    R, condition_means, residual_mask = noise_residuals_by_condition(X, condition_masks)
+    noise_mask = pos_mask | neg_mask
+    C = compute_noise_covariance(R, noise_mask)
+    U_k, evals_k = top_noise_subspace(C, k=k)
+    overlap_topk = float(np.sum((U_k.T @ u_sig) ** 2))
+    cosine2_top1 = float((U_k[:, 0] @ u_sig) ** 2)
+    k_eff = U_k.shape[1]
+    n_eff = U_k.shape[0]
+    expected_random_overlap = k_eff / n_eff
+    expected_random_cosine2 = 1 / n_eff
+    return{
+        'n_pos': n_pos,
+        'n_neg': n_neg,
+        'overlap_topk': overlap_topk,
+        'cosine2_top1': cosine2_top1,
+        'expected_random_overlap': expected_random_overlap,
+        'expected_random_cosine2': expected_random_cosine2,
+        "k_eff": k_eff,
+        "n_eff": n_eff,
+    }
+
