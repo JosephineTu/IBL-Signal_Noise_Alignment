@@ -1,0 +1,145 @@
+# run_condition_geometry.py
+import sys
+from pathlib import Path
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+import src.ibl_io as ibl_io
+import src.firing_rates as fr
+import src.alignment_metrics as am
+import src.trial_selection as ts
+from itertools import combinations
+import numpy as np
+import pandas as pd
+import pickle
+from iblatlas.atlas import AllenAtlas 
+
+def signal_manifold_overlap(X, condition_masks, pos_mask, neg_mask, n_components=3):
+    components, explained_variance_ratio = am.compute_condition_mean_pca(X, condition_masks, n_components=n_components)
+    u_sig = am.compute_signal_axis(X, pos_mask, neg_mask, min_trials=5, eps=1e-12)
+    overlap_by_k = {}
+    U = components.T
+    for k in range(1, U.shape[1]+1):
+        U_k = U[:, :k]
+        overlap = float(np.sum((U_k.T @ u_sig) ** 2))
+        overlap_by_k[k] = overlap
+    # only for plotting
+    _, condition_means, _ = am.noise_residuals_by_condition(X, condition_masks)
+    condition_order = sorted(condition_means.keys())
+    condition_mean_matrix = np.asarray([condition_means[cond] for cond in condition_order], float, )
+    condition_mean_centered = condition_mean_matrix - np.mean(condition_mean_matrix, axis=0, keepdims=True)
+    condition_mean_scores = condition_mean_centered @ U
+
+    return {'components': components, 
+            'explained_variance_ratio': explained_variance_ratio,
+            'u_sig': u_sig,
+            'overlap_by_k': overlap_by_k,
+            'condition_order': condition_order,
+            'condition_mean_scores': condition_mean_scores,}
+
+def compute_signal_axis_pair_similarity(X, trials, u_sig, min_trials=5, eps=1e-12):
+    axes = am.compute_contrast_pair_axes(X, trials, eps=eps)
+    out_pairwise, out_global = am.summarize_contrast_pair_axes(axes, u_sig, eps=eps)
+    return out_pairwise, out_global
+
+def noise_subspace_similarity(X, condition_masks, k=3, eps=1e-12):
+    noise_subspace_similarities, mean_similarity, min_similarity, trial_counts = am.condition_noise_subspaces(X, condition_masks, k=k, eps=eps)
+    random_similarity = am.random_subspace_similarity(X, condition_masks, k=k, eps=eps)
+    return {
+        'noise_subspace_similarities': noise_subspace_similarities,
+        'mean_similarity': mean_similarity,
+        'min_similarity': min_similarity,
+        'random_similarity': random_similarity,
+        'trial_counts': trial_counts,
+    }
+
+def main():
+    one = ibl_io.one_setup(cache_dir="/scratch/midway3/xiaorantu/ONE")
+    data_path = REPO_ROOT / "results" / "VISp_subjects_by_lab.json"
+    eids = ibl_io.build_eids_from_results(data_path)
+    eids_to_run = eids[:5]
+    atlas = AllenAtlas()
+    rows = []
+    details = {}
+    output_dir = Path("results/condition_geometry")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    for eid in eids_to_run:
+        print(f'Processing eid: {eid}')
+        trials = ibl_io.load_trials(one=one, eid=eid)
+        best_pid = ibl_io.pick_best_insertion(one=one, atlas=atlas, eid=eid, target_prefix="VISp")
+        spikes, clusters = ibl_io.load_spikes_and_clusters(one=one, pid=best_pid, atlas=atlas)
+        region_cluster_ids = ibl_io.get_region_cluster_ids(clusters, target_prefix="VISp")
+        stim_on = trials['stimOn_times']
+        stim_off = trials['stimOff_times']
+        X, unit_ids = fr.compute_static_firing_rates(spikes, stim_on, stim_off, region_cluster_ids)
+        X_filtered, unit_mask = fr.filter_active_units(X, eps=1e-10, min_units=5)
+
+        signed_contrast = ts.get_signed_contrast(trials)
+        condition_masks = ts.make_condition_masks(signed_contrast, min_trials=5)
+        high_mask = ts.get_high_masks(signed_contrast, min_trials=5, threshold=0.5)
+        pos_mask, neg_mask = ts.get_pos_neg_masks(signed_contrast, high_mask=high_mask, min_trials=5)
+        
+        signal_manifold_results = signal_manifold_overlap(X_filtered, condition_masks, pos_mask, neg_mask, n_components=3)
+        u_sig = signal_manifold_results['u_sig']
+        pairwise_results, global_results = compute_signal_axis_pair_similarity(X_filtered, trials, u_sig, min_trials=5, eps=1e-12)
+        noise_subspace_results = noise_subspace_similarity(X_filtered, condition_masks, k=3, eps=1e-12)
+        evr = np.asarray(signal_manifold_results['explained_variance_ratio'], float,)
+        overlap = signal_manifold_results['overlap_by_k']
+    
+        row = {
+            "eid": eid,
+            "pid": best_pid,
+            "n_trials": int(X_filtered.shape[0]),
+            "n_units": int(X_filtered.shape[1]),
+            "n_conditions": int(len(condition_masks)),
+
+            "stim_pc1_var": float(evr[0]) if len(evr) > 0 else np.nan,
+            "stim_pc2_var": float(evr[1]) if len(evr) > 1 else np.nan,
+            "stim_pc3_var": float(evr[2]) if len(evr) > 2 else np.nan,
+            "stim_pc123_var": float(np.nansum(evr[:3])),
+
+            "sig_overlap_stim_pc1": overlap.get(1, np.nan),
+            "sig_overlap_stim_pc2": overlap.get(2, np.nan),
+            "sig_overlap_stim_pc3": overlap.get(3, np.nan),
+
+            "noise_mean_condition_similarity": noise_subspace_results["mean_similarity"],
+            "noise_min_condition_similarity": noise_subspace_results["min_similarity"],
+        }
+        random_similarity = noise_subspace_results["random_similarity"]
+        if isinstance(random_similarity, dict):
+            row["random_noise_similarity_mean"] = random_similarity.get("mean", np.nan)
+            row["random_noise_similarity_p95"] = random_similarity.get("p95", np.nan)
+        else:
+            row["random_noise_similarity_mean"] = float(random_similarity)
+        rows.append(row)
+        details[eid] = {
+            "signal_manifold": signal_manifold_results,
+            "pairwise_signal_axes": pairwise_results,
+            "global_signal_axis_summary": global_results,
+            "noise_subspace": noise_subspace_results,
+            "unit_ids": unit_ids[unit_mask],
+            "condition_trial_counts": {
+                float(c): int(mask.sum())
+                for c, mask in condition_masks.items()
+            },
+        }
+        print(
+            f"  PC1={row['stim_pc1_var']:.3f}, "
+            f"sig-PC3={row['sig_overlap_stim_pc3']:.3f}, "
+            f"noise-sim={row['noise_mean_condition_similarity']:.3f}"
+        )
+
+    summary_df = pd.DataFrame(rows)
+    summary_csv = output_dir / "condition_geometry_summary.csv"
+    details_pkl = output_dir / "condition_geometry_details.pkl"
+    summary_df.to_csv(summary_csv, index=False)
+
+    with open(details_pkl, "wb") as f:
+        pickle.dump(details, f)
+
+    print(f"\nSaved summary to {summary_csv}")
+    print(f"Saved details to {details_pkl}")
+
+if __name__ == "__main__":
+    main()
+
