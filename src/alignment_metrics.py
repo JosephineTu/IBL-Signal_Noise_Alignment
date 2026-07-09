@@ -100,6 +100,7 @@ def random_subspace_similarity(X, condition_masks, k=3, n_iter=100, eps=1e-12, s
                     continue
                 n_a = int(np.sum(mask_a_real & residual_mask))
                 n_b = int(np.sum(mask_b_real & residual_mask))
+                # randomly draw n_a and n_b indices from valid_idx without replacement
                 draw = rng.choice(valid_idx, size=n_a + n_b, replace=False)
                 mask_a = np.zeros(X.shape[0], dtype=bool)
                 mask_b = np.zeros(X.shape[0], dtype=bool)
