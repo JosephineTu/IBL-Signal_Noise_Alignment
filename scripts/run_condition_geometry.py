@@ -92,7 +92,8 @@ def main():
             "n_trials": int(X_filtered.shape[0]),
             "n_units": int(X_filtered.shape[1]),
             "n_conditions": int(len(condition_masks)),
-
+            # high contrast u_sig for use
+            "u_sig": np.asarray(u_sig, float),
             "stim_pc1_var": float(evr[0]) if len(evr) > 0 else np.nan,
             "stim_pc2_var": float(evr[1]) if len(evr) > 1 else np.nan,
             "stim_pc3_var": float(evr[2]) if len(evr) > 2 else np.nan,

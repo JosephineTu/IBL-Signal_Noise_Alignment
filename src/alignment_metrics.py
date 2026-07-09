@@ -169,7 +169,7 @@ def summarize_contrast_pair_axes(axes, u_global, eps=1e-12):
         pair = (key_a, key_b)
         out_1[pair] = {
             'cosine_angle': float(cosine_angle),
-            'abs_consine_angle': float(np.abs(cosine_angle)),
+            'abs_cosine_angle': float(np.abs(cosine_angle)),
         }
 
     u_global = np.asarray(u_global, float)
