@@ -11,11 +11,11 @@ def load_spike_window(one, atlas, eid):
     pid = ibl_io.pick_best_insertion(one=one, atlas=atlas, eid=eid, target_prefix="VISp")
     spikes, clusters = ibl_io.load_spikes_and_clusters(one=one, atlas=atlas, pid=pid)
     spike_times = np.asarray(spikes['times'], float)
-    rec_start = np.finite_min(spike_times)
-    rec_end = np.finite_max(spike_times[spike_times < first_stim])
-    spike_times = spike_times[(spike_times >= rec_start) & (spike_times < rec_end)]
+    rec_start = float(np.nanmin(spike_times[np.isfinite(spike_times)]))
+    rec_end = float(np.nanmax(spike_times[np.isfinite(spike_times) & (spike_times < first_stim)]))
     spike_clusters = np.asarray(spikes['clusters'])
-    spike_clusters = spike_clusters[(spike_times >= rec_start) & (spike_times <= rec_end)]
+    spike_clusters = spike_clusters[(spike_times >= rec_start) & (spike_times < rec_end)]
+    spike_times = spike_times[(spike_times >= rec_start) & (spike_times < rec_end)]
     trimmed_spikes = {'times': spike_times, 'clusters': spike_clusters}
     return rec_start, rec_end, trimmed_spikes
 
@@ -41,6 +41,14 @@ def compute_null_covariance(X):
     C = np.cov(X.T, bias=False)
     C = 0.5 * (C + C.T)
     return C
+
+def vector_subspace_projection(delta_mu, U):
+    # directly comparable to task signal-noise alignment
+    delta_mu = np.asarray(delta_mu, float)
+    U = np.asarray(U, float)
+    projection = U @ (U.T @ delta_mu)
+    overlap = float((np.sum(projection ** 2)) / (np.sum(delta_mu ** 2)))
+    return projection, overlap
 
 
 

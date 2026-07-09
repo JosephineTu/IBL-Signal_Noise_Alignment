@@ -10,7 +10,6 @@ def one_setup(cache_dir: str):
         base_url="https://openalyx.internationalbrainlab.org",
         silent=True,
     )
-
     one = ONE(
         base_url="https://openalyx.internationalbrainlab.org",
         password="international",
