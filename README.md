@@ -1,113 +1,120 @@
-# Signal–Noise Alignment in IBL Brain-Wide Map VISp Data
+# Signal-Noise Alignment in IBL Brain-Wide Map VISp Data
 
-This repository analyzes how stimulus-related population response differences relate to dominant residual/noise covariance modes in International Brain Laboratory (IBL) Brain-Wide Map Neuropixels recordings. The current analysis focuses on visual cortex, especially VISp, during the IBL visual decision-making task.
+This repository analyzes whether stimulus-coding directions in VISp population activity are aligned with dominant trial-to-trial residual variability in International Brain Laboratory (IBL) Brain-Wide Map Neuropixels recordings.
 
-The central question is:
+The working question is:
 
-> Are visual stimulus coding directions aligned with, or separated from, the dominant low-dimensional modes of trial-to-trial population variability?
+> Do visual stimulus signal vectors lie inside the dominant noise subspace, or are they geometrically separated from it?
 
-The current repository implements data loading, VISp session/insertion selection, firing-rate construction, trial/condition parsing, signal/noise geometry metrics, condition-mean geometry analysis, and a pre-first-stimulus baseline recording-duration check. Decoding, noise ablation, and full Fisher-information analyses are not treated as part of the current main README scope.
+The current code focuses on VISp units during the IBL visual decision-making task. It implements data access through `one.api`, session and insertion selection, trial parsing, firing-rate construction, condition geometry, and time-resolved signal/noise alignment.
 
----
+## Dataset and Paper Context
 
-## 1. Dataset
+This project uses the public IBL Brain-Wide Map (BWM) dataset:
 
-This project uses the public IBL Brain-Wide Map (BWM) Neuropixels dataset. The associated paper is:
+> International Brain Laboratory. **A brain-wide map of neural activity during complex behaviour.** *Nature* (2025). https://www.nature.com/articles/s41586-025-09235-0
 
-> International Brain Laboratory. **A brain-wide map of neural activity during complex behaviour.** *Nature* (2025).  
-> https://www.nature.com/articles/s41586-025-09235-0
+The BWM paper reports Neuropixels recordings from mice performing a standardized visual decision-making task. The paper's main stimulus analyses compare left versus right visual stimuli, often in stimulus-aligned windows such as 0-100 ms after stimulus onset. This repository asks a related but more geometric question: how the stimulus mean-difference vector relates to the dominant residual/noise covariance modes in VISp.
 
-The BWM dataset contains large-scale Neuropixels recordings from mice performing a standardized visual decision-making task. The published BWM release reports 621,733 neurons recorded with 699 Neuropixels probes across 139 mice in 12 laboratories, covering 279 brain areas.
+Useful links:
 
-Useful IBL resources:
-
-- Brain-Wide Map paper: https://www.nature.com/articles/s41586-025-09235-0
+- BWM paper: https://www.nature.com/articles/s41586-025-09235-0
 - IBL Brain-Wide Map page: https://www.internationalbrainlab.com/brainwide-map
 - ONE quick start: https://docs.internationalbrainlab.org/notebooks_external/one_quickstart.html
-- Public data download guide: https://docs.internationalbrainlab.org/notebooks_external/data_download.html
-- Loading examples: https://docs.internationalbrainlab.org/loading_examples.html
+- IBL loading examples: https://docs.internationalbrainlab.org/loading_examples.html
 
----
+## Experimental Task
 
-## 2. Experimental protocol and behavioral task
+The recordings come from the IBL visual decision-making task. Each mouse is head-fixed in front of a screen and controls a wheel with its front paws.
 
-The recordings come from the standardized IBL visual decision-making task used in the Brain-Wide Map study.
+On each trial:
 
-### Task structure
+1. A visual stimulus appears on the left or right side of the screen.
+2. The mouse turns the wheel to move the stimulus to the center.
+3. The response window is free, up to 60 s after stimulus onset.
+4. Correct trials receive water reward.
+5. Incorrect trials receive a white-noise pulse and a 2 s timeout.
+6. The next trial begins after a delay and a quiescence period, during which the wheel must be held still.
 
-Mice are head-fixed in front of a screen and use their front paws to turn a wheel. On each trial, a visual stimulus appears in the left or right visual field. The mouse must turn the wheel to move the visual stimulus to the center of the screen. Correct choices are rewarded with water; incorrect choices receive negative feedback such as a white-noise pulse and timeout.
+The stimulus is a peripheral visual grating. Stimulus contrast is sampled from five levels in the BWM task: 100%, 25%, 12.5%, 6.25%, and 0%. On 0% contrast trials, no visual stimulus is visible, but the trial is still assigned a correct side according to the current block statistics.
 
-### Stimulus type
+The task starts with 90 unbiased trials, where the left and right stimulus probabilities are equal. After that, trials occur in biased blocks. In right-bias blocks, stimuli appear on the right on 80% of trials; in left-bias blocks, stimuli appear on the right on 20% of trials. Block changes are not explicitly cued.
 
-The stimulus is a peripheral visual grating. In the IBL task description, mice move a 35° peripheral visual grating to the center of the screen by turning a wheel. The stimulus can appear on the left or right side, and its contrast varies across trials.
+### Trial Timeline
 
-In the ALF trial object, the visual stimulus is represented mainly by:
+This README distinguishes the full behavioral trial from the analysis windows used in this repository.
 
-```text
-contrastLeft
-contrastRight
-stimOn_times
-stimOff_times
+```mermaid
+flowchart LR
+    A["previous trial end"] --> B["delay"]
+    B --> C["quiescence: wheel still"]
+    C --> D["stimOn_times"]
+    D --> E["visual grating on left or right"]
+    E --> F["firstMovement_times"]
+    F --> G["choice by wheel turn"]
+    G --> H["feedback_times"]
+    H --> I["reward or white-noise timeout"]
+    I --> J["next trial"]
 ```
 
-For most trials, one side has a nonzero contrast and the other side is zero. The analysis defines a signed contrast as:
+Key ALF trial fields:
 
 ```text
-signed_contrast = contrastLeft - contrastRight
+stimOn_times          stimulus onset
+stimOff_times         stimulus offset
+contrastLeft          left stimulus contrast, NaN if no left stimulus
+contrastRight         right stimulus contrast, NaN if no right stimulus
+choice                animal's wheel-turn choice
+feedbackType          reward or non-reward
+feedback_times        feedback onset
+firstMovement_times   first detected wheel movement
+probabilityLeft       current block prior
+intervals             trial start and end interval
 ```
 
-Therefore:
+The BWM paper excludes trials from its main analyses when required events cannot be detected, and excludes trials with first wheel-movement time outside 0.08-2.00 s. This repository currently filters only for finite `stimOn_times` and `stimOff_times` inside `src/ibl_io.py`; stricter behavioral exclusion can be added if the analysis needs closer matching to the paper.
+
+## Repository Analysis Windows
+
+The repository currently uses two stimulus-aligned response definitions.
+
+### Static stimulus-window response
+
+Used by `scripts/run_condition_geometry.py`:
 
 ```text
-signed_contrast > 0  -> left-side visual stimulus
-signed_contrast < 0  -> right-side visual stimulus
-signed_contrast = 0  -> zero-contrast / no visual evidence trial
+interval_i = [stimOn_times_i, stimOff_times_i]
+X_i,n = spike_count(unit n in interval_i) / duration(interval_i)
+X shape = n_trials x n_units
 ```
 
-The sign convention follows the repository's internal trial-selection code. If a downstream analysis uses right-choice labels or right-stimulus labels, the sign should be checked explicitly.
+This static matrix is used for condition-mean geometry across signed contrast values.
 
-### Prior-probability blocks
+### Time-binned stimulus response
 
-The IBL task includes blockwise stimulus-side priors. The probability that the stimulus appears on the right alternates between biased blocks, commonly 0.2 and 0.8, with an initial unbiased block. This is available in the trial field:
+Used by `scripts/run_timebinned_alignment.py`:
 
 ```text
-probabilityLeft
+window_b = [stimOn_times + bin_start_b, stimOn_times + bin_end_b]
+X_i,b,n = spike_count(unit n in window_b) / bin_size
+X shape = n_trials x n_bins x n_units
 ```
 
-This repository currently focuses on stimulus-evoked population geometry. Behavioral variables such as choice, feedback, first movement time, and block prior are loaded for context but are not the main target of the current signal/noise geometry analysis.
-
-### Trial fields used in this repository
-
-The main trial fields are:
+Default parameters:
 
 ```text
-stimOn_times
-stimOff_times
-contrastLeft
-contrastRight
-choice
-feedbackType
-probabilityLeft
-firstMovement_times
-intervals
+t_start = 0.0 s
+t_end = 0.4 s
+bin_size = 0.08 s
+step_size = 0.02 s
+k = 3 noise dimensions
 ```
 
-The core stimulus-geometry analysis primarily uses:
+This makes alignment curves from stimulus onset through the first 400 ms after stimulus onset.
 
-```text
-stimOn_times
-stimOff_times
-contrastLeft
-contrastRight
-```
+## Using ONE API
 
----
-
-## 3. Environment and data access
-
-The repository uses the public OpenAlyx server through the ONE API.
-
-Example setup:
+The repository uses OpenAlyx through `one.api`.
 
 ```python
 from one.api import ONE
@@ -124,414 +131,288 @@ one = ONE(
 )
 ```
 
-On Midway, activate the IBL environment with:
+The helper used by the scripts is:
 
-```bash
-source activate /scratch/midway3/xiaorantu/conda_envs/ibl
+```python
+import src.ibl_io as ibl_io
+
+one = ibl_io.one_setup(cache_dir="/scratch/midway3/xiaorantu/ONE")
 ```
 
-The cache directory should be placed on scratch rather than in the home directory because spike-sorting files are large.
+The cache directory should be on scratch or another large local storage location because spike-sorting files are large.
 
----
+Typical loading flow:
 
-## 4. Current repository organization
+```python
+from iblatlas.atlas import AllenAtlas
+import src.ibl_io as ibl_io
 
-The current code is organized around reusable source files and scripts.
+atlas = AllenAtlas()
+eids = ibl_io.build_eids_from_results("results/VISp_subjects_by_lab.json")
+eid = eids[0]
+
+trials = ibl_io.load_trials(one, eid)
+pid = ibl_io.pick_best_insertion(one, atlas, eid, target_prefix="VISp")
+spikes, clusters = ibl_io.load_spikes_and_clusters(one, atlas, pid)
+region_cluster_ids = ibl_io.get_region_cluster_ids(clusters, target_prefix="VISp")
+```
+
+## Repository Structure
 
 ```text
-signal_noise_alignment/
+IBL-Signal_Noise_Alignment/
   README.md
   src/
-    ibl_io.py
-    firing_rates.py
-    trial_selection.py
-    alignment_metrics.py
-    check_prestim_recording_period.py
+    ibl_io.py              ONE/OpenAlyx loading and VISp insertion selection
+    firing_rates.py        static and time-resolved firing-rate matrices
+    trial_selection.py     signed contrast and condition masks
+    alignment_metrics.py   signal axes, residual covariance, subspace metrics
+    null_model.py          pre-first-stimulus baseline helpers
+    time_bin.py            generic time-binned metric runner
   scripts/
     run_condition_geometry.py
+    run_timebinned_alignment.py
+    check_prestim_recording.py
+  figures/
+    figure_1/              condition-mean stimulus manifolds
+    figure_2/              condition-specific noise subspace similarities
+    figure_4/              time-binned top-k signal/noise overlap
+    figure_5_*/            time-binned top-1 signal/noise alignment
   results/
     VISp_subjects_by_lab.json
+    condition_geometry/
+    timebinned_alignment/
+    pre_first_stim_recording_check.csv
 ```
 
-The exact set of files may change as the analysis develops, but the current main pipeline is function-based rather than a single monolithic analyzer class.
+## Trial and Condition Definitions
 
-### `src/ibl_io.py`
-
-Handles IBL/ONE data access and session-level loading utilities, including:
-
-- ONE setup with OpenAlyx
-- reading the current VISp eid list from `results/VISp_subjects_by_lab.json`
-- loading trial data
-- selecting the best probe insertion for a target visual area
-- loading spikes and clusters
-- extracting cluster IDs for a target region such as VISp
-
-### `src/firing_rates.py`
-
-Builds trial-by-neuron firing-rate matrices from spike times and trial intervals.
-
-The main static stimulus-response matrix is:
-
-```text
-X shape = n_trials × n_units
-```
-
-where firing rates are computed over the stimulus presentation window:
-
-```text
-stimOn_times -> stimOff_times
-```
-
-### `src/trial_selection.py`
-
-Defines stimulus labels and condition masks from trial contrast fields.
-
-The main variables are:
-
-```text
-signed_contrast = contrastLeft - contrastRight
-high-contrast mask
-positive stimulus mask
-negative stimulus mask
-condition masks for distinct signed contrasts
-contrast-pair masks
-```
-
-This file determines which trials enter each signal/noise or condition-geometry computation.
-
-### `src/alignment_metrics.py`
-
-Implements the linear algebra used for population geometry analysis, including:
-
-- condition means
-- signal axes from mean response differences
-- residual responses after condition-mean subtraction
-- residual/noise covariance matrices
-- eigendecomposition of noise covariance
-- dominant noise subspaces
-- signal/noise overlap metrics
-- condition-mean PCA / condition geometry summaries
-
-### `src/check_prestim_recording_period.py`
-
-Checks whether the current VISp sessions contain neural recording before the first task stimulus onset. This script does not assume official IBL passive-period metadata. It asks a simpler matched-session question:
-
-> For the selected VISp insertion, how much spike recording exists before the first `stimOn_times` event?
-
-The output is saved as:
-
-```text
-results/pre_first_stim_recording_check.csv
-```
-
-This is useful for deciding whether a matched pre-task baseline covariance can be estimated from the same session and insertion.
-
----
-
-## 5. Session and insertion selection
-
-The current analysis uses a precomputed VISp session list:
-
-```text
-results/VISp_subjects_by_lab.json
-```
-
-The JSON is organized by lab and subject and stores the selected VIS eids. Downstream scripts build a flat eid list from this file.
-
-For each eid, the code selects a probe insertion containing visual cortex units. The current target region is VISp or a VIS/VISp prefix depending on the analysis script. The selected insertion is then used to load spikes, clusters, and VISp cluster IDs.
-
----
-
-## 6. Firing-rate construction
-
-For each selected session and insertion:
-
-1. Load trials.
-2. Load spikes and clusters from the selected probe insertion.
-3. Select clusters belonging to the target visual area.
-4. Count spikes in the stimulus window.
-5. Convert spike counts to firing rates.
-
-For the static stimulus-response analysis:
-
-```text
-interval_i = [stimOn_times_i, stimOff_times_i]
-X_i,n = spike_count_i,n / interval_duration_i
-```
-
-This gives:
-
-```text
-X ∈ R^{n_trials × n_units}
-```
-
-Low-variance or inactive units can be filtered before covariance estimation to avoid numerical degeneracy.
-
----
-
-## 7. Trial and condition definitions
-
-The main stimulus variable is signed contrast:
+The code defines signed contrast as:
 
 ```text
 signed_contrast = contrastLeft - contrastRight
 ```
 
-The current analysis separates trials into positive and negative stimulus groups and can also construct condition-specific masks for each signed contrast value.
-
-A typical high-contrast stimulus mask is defined by excluding zero-contrast trials and selecting trials whose absolute signed contrast is above a threshold:
+With this repository's convention:
 
 ```text
-high_mask = (signed_contrast != 0) and (abs(signed_contrast) > threshold)
+signed_contrast > 0    left-side visual stimulus
+signed_contrast < 0    right-side visual stimulus
+signed_contrast = 0    zero-contrast / no visible stimulus
 ```
 
-Then:
+Be careful when comparing to papers or plots that use the opposite sign convention. The BWM paper's psychometric signed-contrast convention should not be assumed to match this repository's internal `contrastLeft - contrastRight` convention.
+
+The high-contrast binary signal axis uses:
 
 ```text
-pos_mask = high_mask and signed_contrast > 0
-neg_mask = high_mask and signed_contrast < 0
+high_mask = abs(signed_contrast) >= 0.5
+pos_mask = high_mask & (signed_contrast > 0)
+neg_mask = high_mask & (signed_contrast < 0)
 ```
 
-These masks are used to compute stimulus signal axes and residual/noise covariance.
-
----
-
-## 8. Signal/noise geometry definitions
-
-For one session, define:
+The condition-geometry analysis also builds masks for each signed contrast level:
 
 ```text
-X ∈ R^{T × N}
+condition c = all trials where signed_contrast == c
 ```
 
-where `T` is the number of trials and `N` is the number of selected units.
+## Signal/Noise Geometry
 
-For two stimulus groups:
+For one session or one time bin, let:
 
 ```text
-μ_pos = mean population response on positive stimulus trials
-μ_neg = mean population response on negative stimulus trials
+X in R^(T x N)
 ```
 
-The stimulus signal vector is:
+where `T` is the number of trials and `N` is the number of selected VISp units.
+
+### Signal Vector
+
+For positive and negative high-contrast stimulus groups:
 
 ```text
-Δμ = μ_pos - μ_neg
+mu_pos = mean(X_i for positive stimulus trials)
+mu_neg = mean(X_i for negative stimulus trials)
+Delta_mu = mu_pos - mu_neg
+u_sig = Delta_mu / ||Delta_mu||
 ```
 
-The normalized signal axis is:
+This `u_sig` is the normalized stimulus signal vector.
+
+### Residual or Noise Covariance
+
+Residuals are computed after subtracting the appropriate condition mean:
 
 ```text
-u_sig = Δμ / ||Δμ||
+R_i = X_i - mu_pos    if trial i is positive
+R_i = X_i - mu_neg    if trial i is negative
 ```
 
-Residual responses are condition-centered:
-
-```text
-R_i = X_i - μ_pos, if trial i is positive
-R_i = X_i - μ_neg, if trial i is negative
-```
-
-The residual/noise covariance is:
+The repository estimates residual covariance with Ledoit-Wolf shrinkage:
 
 ```text
 C_noise = Cov(R)
-```
-
-After eigendecomposition:
-
-```text
-C_noise = U Λ Uᵀ
-```
-
-where:
-
-```text
-u_1 = first noise eigenvector
+C_noise = U Lambda U^T
 U_k = [u_1, ..., u_k]
 ```
 
-The current repository computes the following core metrics.
+### Alignment Metrics
 
-### Top-1 signal/noise cosine
-
-```text
-top1_cos = |u_sigᵀ u_1|
-```
-
-This measures alignment between the stimulus axis and the dominant residual covariance mode.
-
-### Top-k signal/noise overlap
+Top-1 alignment:
 
 ```text
-topk_overlap = ||U_kᵀ Δμ||² / ||Δμ||²
+cosine2_top1 = (u_1^T u_sig)^2
 ```
 
-This measures how much stimulus mean-difference energy lies inside the top-k noise subspace.
-
-### Noise spectrum and effective dimensionality
-
-The repository also summarizes the residual covariance spectrum, including the top eigenvalues and participation ratio:
+Top-k overlap:
 
 ```text
-PR = (sum_i λ_i)^2 / sum_i λ_i^2
+overlap_topk = ||U_k^T u_sig||^2
 ```
 
-Small participation ratio indicates that residual variability is concentrated in a low-dimensional subspace.
-
----
-
-## 9. Condition-mean geometry
-
-In addition to the binary high-contrast signal axis, the repository analyzes geometry across multiple signed contrast conditions.
-
-For each signed contrast condition `c`, compute:
+For comparison to random orientation:
 
 ```text
-μ_c = mean population response for trials with signed_contrast = c
+expected_random_cosine2 = 1 / N
+expected_random_overlap = k / N
 ```
 
-The set of condition means forms a low-dimensional stimulus manifold inside neural population space. The repository analyzes this using condition-mean PCA and contrast-pair axes.
+The implementation is in `src/alignment_metrics.py`.
 
-This addresses whether the single binary signal axis is a stable description of visual coding, or whether different contrast pairs induce different local stimulus axes.
+## Current Pipeline
 
-Typical quantities include:
+### 1. Condition geometry
 
-```text
-condition means μ_c
-PCA of condition means
-contrast-pair axes Δμ_pair
-cosine / alignment between contrast-pair axes
-```
-
-This analysis is important because the original high-contrast axis assumes a common left-right visual coding direction. The condition-geometry analysis checks whether that assumption is approximately valid across contrast conditions.
-
----
-
-## 10. Pre-first-stimulus baseline check
-
-The current BWM eids tested so far do not expose an official `passivePeriods` or `spontaneousActivity` dataset through the simple ONE query:
-
-```python
-one.load_dataset(eid, "*passivePeriods*", collection="alf")
-```
-
-However, the same sessions can contain spike recording before the first task stimulus onset. The current repository therefore includes a check for the duration of pre-first-stimulus recording in the selected VISp insertion.
-
-This is not called official passive spontaneous activity. It is a matched pre-task baseline interval:
-
-```text
-recording_start -> first stimOn
-```
-
-Preliminary examples from the current eid list:
-
-```text
-b9c205c3-feac-485b-a89d-afc96d9cb280
-  first stimOn: 22.443 s
-  VISp pre-first-stim duration: 22.37 s
-  VISp spikes before first stim: 1249
-
-e1931de1-cf7b-49af-af33-2ade15e8abe7
-  first stimOn: 10.544 s
-  VISp pre-first-stim duration: 10.54 s
-  VISp spikes before first stim: 5052
-```
-
-Interpretation:
-
-- The current sessions do contain pre-first-stimulus neural activity.
-- The interval is short, around 10–22 seconds in the first checked sessions.
-- This interval may be useful as a matched pre-task baseline check.
-- It should not be described as the official IBL passive spontaneous protocol unless passive-period metadata are explicitly available for that eid.
-
----
-
-## 11. Current interpretation
-
-The current repository supports the following analysis scope:
-
-1. Load public IBL BWM task sessions and VISp units.
-2. Construct stimulus-evoked population firing-rate matrices.
-3. Define signed visual stimulus conditions from `contrastLeft` and `contrastRight`.
-4. Compute stimulus signal axes from condition-averaged population responses.
-5. Compute residual/noise covariance after subtracting condition means.
-6. Compare stimulus axes with dominant residual/noise covariance modes.
-7. Analyze whether condition means across contrast levels share a stable low-dimensional geometry.
-8. Check whether matched pre-first-stimulus recording exists for baseline/null analyses.
-
-The current working interpretation is:
-
-> Dominant residual covariance modes provide a low-dimensional description of trial-to-trial population variability. The main analysis asks whether visual stimulus coding directions lie inside these dominant variability modes or avoid them. Condition-mean geometry is used to test whether the stimulus axis itself is stable across contrast conditions, rather than assuming one fixed binary signal axis.
-
-The pre-first-stimulus result updates the null-model plan:
-
-> The current task eids do not appear to expose official passive-period metadata through the simple `passivePeriods` object, but they do contain short matched pre-task recording intervals. These intervals can support a conservative pre-task baseline check, but they should be treated separately from a full passive spontaneous-state covariance analysis.
-
----
-
-## 12. How to run the current checks
-
-Activate the environment:
-
-```bash
-source activate /scratch/midway3/xiaorantu/conda_envs/ibl
-```
-
-Run the condition-geometry analysis from the repository root or the intended script location:
+Run:
 
 ```bash
 python scripts/run_condition_geometry.py
 ```
 
-Run the pre-first-stimulus recording check:
+Outputs:
 
-```bash
-cd /home/xiaorantu/signal_noise_alignment/src
-python check_prestim_recording_period.py
+```text
+results/condition_geometry/condition_geometry_summary.csv
+results/condition_geometry/condition_geometry_details.pkl
+figures/figure_1/*_signal_condition_manifold.png
+figures/figure_2/*_noise_condition_similarity.png
 ```
 
-The pre-first-stimulus check writes:
+This analysis asks whether condition means across signed contrasts occupy a low-dimensional stimulus manifold, and whether condition-specific residual/noise subspaces are similar across stimulus conditions.
+
+Example current figure:
+
+![Example signal condition manifold](./figures/figure_1/07dc4b_signal_condition_manifold.png)
+
+![Example noise condition similarity](./figures/figure_2/07dc4b_noise_condition_similarity.png)
+
+### 2. Time-binned signal/noise alignment
+
+Run:
+
+```bash
+python scripts/run_timebinned_alignment.py \
+  --cache-dir /scratch/midway3/xiaorantu/ONE \
+  --t-start 0.0 \
+  --t-end 0.4 \
+  --bin-size 0.08 \
+  --step-size 0.02 \
+  --k 3 \
+  --max-sessions 5
+```
+
+Outputs:
+
+```text
+results/timebinned_alignment/*_timebinned_alignment_summary.csv
+results/timebinned_alignment/*_timebinned_alignment_details.pkl
+figures/figure_4/*_figure4_overlap_topk.png
+figures/figure_5_1/*_figure5_alignment_top1.png
+figures/figure_5_2/*_figure5_alignment_top1.png
+figures/figure_5_3/*_figure5_alignment_top1.png
+```
+
+Example current figure:
+
+![Example top-k overlap over time](./figures/figure_4/07dc4b76_t0p0to0p4_bin0p08_step0p02_k3_figure4_overlap_topk.png)
+
+![Example top-1 alignment over time](./figures/figure_5_1/07dc4b76_t0p0to0p4_bin0p08_step0p02_k3_figure5_alignment_top1.png)
+
+### 3. Pre-first-stimulus recording check
+
+Run:
+
+```bash
+python scripts/check_prestim_recording.py
+```
+
+Output:
 
 ```text
 results/pre_first_stim_recording_check.csv
 ```
 
-For long checks over many sessions, use a Slurm job rather than running on the login node.
+This checks how much neural recording exists before the first `stimOn_times` event in the same selected session/insertion. It should be described as a matched pre-first-stimulus baseline check, not as the official IBL passive spontaneous protocol unless passive-period metadata are explicitly loaded for that session.
 
----
+## Current Results Snapshot
 
-## 13. Notes on terminology
+The current checked VISp sessions show that the condition-mean stimulus geometry is low-dimensional. In `results/condition_geometry/condition_geometry_summary.csv`, the first three condition PCs explain about 0.92-0.98 of condition-mean variance across the five current sessions.
 
-Use these terms carefully:
-
-```text
-residual/noise covariance
-```
-
-means covariance of trial-to-trial residuals after subtracting condition-specific evoked means.
+The time-binned alignment outputs summarize:
 
 ```text
-pre-first-stimulus baseline
+cosine2_top1       alignment of the signal vector with the dominant noise eigenmode
+overlap_topk       signal-vector energy inside the top-k noise subspace
+expected_random_*  random-orientation baseline given the number of units
 ```
 
-means spike activity before the first task stimulus onset in the same session/insertion.
+These outputs are best interpreted session by session at the current stage. The repository already stores both observed and random-orientation baseline values, so downstream plots can ask whether signal/noise alignment is consistently above chance and whether it changes over the first 400 ms after stimulus onset.
 
-```text
-passive spontaneous activity
+## Notes for Researchers Reusing the Pipeline
+
+Start from `results/VISp_subjects_by_lab.json`, which stores the current VISp session list by lab and subject. The scripts flatten that JSON into eids, choose the insertion with the most units matching `target_prefix`, and then load spikes, clusters, and trials through ONE/OpenAlyx.
+
+The minimum sequence for a new analysis is:
+
+```python
+import src.ibl_io as ibl_io
+import src.firing_rates as fr
+import src.trial_selection as ts
+import src.alignment_metrics as am
+
+trials = ibl_io.load_trials(one, eid)
+pid = ibl_io.pick_best_insertion(one, atlas, eid, target_prefix="VISp")
+spikes, clusters = ibl_io.load_spikes_and_clusters(one, atlas, pid)
+region_cluster_ids = ibl_io.get_region_cluster_ids(clusters, target_prefix="VISp")
+
+X, unit_ids = fr.compute_static_firing_rates(
+    spikes,
+    trials["stimOn_times"],
+    trials["stimOff_times"],
+    region_cluster_ids,
+)
+X, unit_mask = fr.filter_active_units(X, min_units=5)
+
+signed_contrast = ts.get_signed_contrast(trials)
+metrics = am.signal_noise_alignment(X, signed_contrast, k=3, min_trials=5)
 ```
 
-should be reserved for sessions where IBL passive-period metadata are actually present and loadable.
+For time-resolved analysis, use `compute_time_resolved_firing_rates` and `run_timebinned_metric`, as in `scripts/run_timebinned_alignment.py`.
 
-```text
-condition geometry
-```
+## Terminology
 
-means the geometry of condition-averaged population responses across signed contrast values.
+`Signal vector` means the mean population response difference between two stimulus groups.
 
----
+`Noise` or `residual covariance` means trial-to-trial covariance after subtracting condition-specific evoked means.
 
-## 14. References
+`Noise subspace` means the top eigenvectors of the residual covariance matrix.
+
+`Condition geometry` means geometry of condition-averaged population responses across signed contrast levels.
+
+`Pre-first-stimulus baseline` means activity before the first task stimulus onset in the same recording, not the official passive protocol.
+
+## References
 
 - International Brain Laboratory. **A brain-wide map of neural activity during complex behaviour.** *Nature* (2025). https://www.nature.com/articles/s41586-025-09235-0
 - International Brain Laboratory Brain-Wide Map page. https://www.internationalbrainlab.com/brainwide-map
