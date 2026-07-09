@@ -175,9 +175,13 @@ IBL-Signal_Noise_Alignment/
     check_prestim_recording.py
   figures/
     figure_1/              condition-mean stimulus manifolds
+    figure_1_2/            pairwise signal axes vs global signal axis
     figure_2/              condition-specific noise subspace similarities
+    figure_3/              noise subspace similarities vs random baseline
     figure_4/              time-binned top-k signal/noise overlap
     figure_5_*/            time-binned top-1 signal/noise alignment
+    plot_signal_axis_global_similarity.py
+    plot_condition_noise_random_baseline.py
   results/
     VISp_subjects_by_lab.json
     condition_geometry/
@@ -240,6 +244,21 @@ u_sig = Delta_mu / ||Delta_mu||
 
 This `u_sig` is the normalized stimulus signal vector.
 
+The condition-geometry pipeline also computes pairwise condition axes:
+
+```text
+Delta_mu_(a,b) = mu_a - mu_b
+u_(a,b) = Delta_mu_(a,b) / ||Delta_mu_(a,b)||
+```
+
+These pairwise axes are compared with the global high-contrast signal axis:
+
+```text
+axis_global_similarity_(a,b) = |u_(a,b)^T u_sig|
+```
+
+This asks whether local contrast-pair signal directions agree with the global left-versus-right high-contrast signal direction.
+
 ### Residual or Noise Covariance
 
 Residuals are computed after subtracting the appropriate condition mean:
@@ -299,13 +318,38 @@ figures/figure_1/*_signal_condition_manifold.png
 figures/figure_2/*_noise_condition_similarity.png
 ```
 
-This analysis asks whether condition means across signed contrasts occupy a low-dimensional stimulus manifold, and whether condition-specific residual/noise subspaces are similar across stimulus conditions.
+This analysis asks whether condition means across signed contrasts occupy a low-dimensional stimulus manifold, whether pairwise contrast axes align with the global high-contrast signal axis, and whether condition-specific residual/noise subspaces are similar across stimulus conditions.
+
+Generate the signal-axis/global-axis plots:
+
+```bash
+python figures/plot_signal_axis_global_similarity.py \
+  --details-pkl results/condition_geometry/condition_geometry_details.pkl \
+  --summary-csv results/condition_geometry/condition_geometry_summary.csv \
+  --out-dir figures/figure_1_2/signal_axis_vs_global_thresh025 \
+  --high-threshold 0.25
+```
+
+Generate condition-noise random-baseline plots:
+
+```bash
+python figures/plot_condition_noise_random_baseline.py \
+  --summary-csv results/condition_geometry/condition_geometry_summary.csv \
+  --details-pkl results/condition_geometry/condition_geometry_details.pkl \
+  --out-dir figures/figure_3
+```
 
 Example current figure:
 
 ![Example signal condition manifold](./figures/figure_1/07dc4b_signal_condition_manifold.png)
 
+![Example signal axis vs global axis](./figures/figure_1_2/signal_axis_vs_global_thresh025/07dc4b_signal_axis_vs_global_abs_cosine.png)
+
+![Group signal axis vs global axis](./figures/figure_1_2/signal_axis_vs_global_thresh025/group_signal_axis_vs_global_by_category_abs_cosine.png)
+
 ![Example noise condition similarity](./figures/figure_2/07dc4b_noise_condition_similarity.png)
+
+![Example noise random baseline](./figures/figure_3/07dc4b_condition_noise_random_baseline.png)
 
 ### 2. Time-binned signal/noise alignment
 
@@ -358,6 +402,10 @@ This checks how much neural recording exists before the first `stimOn_times` eve
 ## Current Results Snapshot
 
 The current checked VISp sessions show that the condition-mean stimulus geometry is low-dimensional. In `results/condition_geometry/condition_geometry_summary.csv`, the first three condition PCs explain about 0.92-0.98 of condition-mean variance across the five current sessions.
+
+The updated condition-geometry outputs also store the global high-contrast signal axis (`u_sig`) and the pairwise signal-axis summaries in `condition_geometry_details.pkl`. The `figure_1_2` plots show how each local contrast-pair axis aligns with the global axis, grouped by whether both, one, or neither condition is high contrast.
+
+The `figure_3` plots compare observed condition-wise noise subspace similarity with a pseudo-condition random baseline. This helps distinguish stable condition-specific noise geometry from similarity expected after randomly partitioning residual trials.
 
 The time-binned alignment outputs summarize:
 
