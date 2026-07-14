@@ -98,14 +98,14 @@ def random_subspace_similarity(X, condition_masks, k=3, n_iter=100, eps=1e-12, s
             for cond_b, mask_b_real in cond_items:
                 if cond_a >= cond_b:
                     continue
-                n_a = int(np.sum(mask_a_real & residual_mask))
-                n_b = int(np.sum(mask_b_real & residual_mask))
-                # randomly draw n_a and n_b indices from valid_idx without replacement
-                draw = rng.choice(valid_idx, size=n_a + n_b, replace=False)
+                idx_a = np.flatnonzero(mask_a_real & residual_mask)
+                idx_b = np.flatnonzero(mask_b_real & residual_mask)
+                pair_idx = np.concatenate([idx_a, idx_b])
+                draw = rng.permutation(pair_idx)
                 mask_a = np.zeros(X.shape[0], dtype=bool)
                 mask_b = np.zeros(X.shape[0], dtype=bool)
-                mask_a[draw[:n_a]] = True
-                mask_b[draw[n_a:n_a + n_b]] = True
+                mask_a[draw[:len(idx_a)]] = True
+                mask_b[draw[len(idx_a):]] = True
                 C_a = compute_noise_covariance(R, mask_a)
                 C_b = compute_noise_covariance(R, mask_b)
                 U_a, _ = top_noise_subspace(C_a, k=k)
