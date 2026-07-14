@@ -168,7 +168,6 @@ def summarize_contrast_pair_axes(axes, u_global, eps=1e-12):
         cosine_angle = np.dot(u_a, u_b) / (np.linalg.norm(u_a) * np.linalg.norm(u_b) + eps)
         pair = (key_a, key_b)
         out_1[pair] = {
-            'cosine_angle': float(cosine_angle),
             'abs_cosine_angle': float(np.abs(cosine_angle)),
         }
 
@@ -178,7 +177,6 @@ def summarize_contrast_pair_axes(axes, u_global, eps=1e-12):
         u = np.asarray(u, float)
         cosine_global = np.dot(u, u_global) / (np.linalg.norm(u) * np.linalg.norm(u_global) + eps)
         out_2[pair_key] = {
-            'cosine_global': float(cosine_global),
             'abs_cosine_global': float(np.abs(cosine_global)),
         }
     return out_1, out_2

@@ -105,6 +105,8 @@ def main():
 
             "noise_mean_condition_similarity": noise_subspace_results["mean_similarity"],
             "noise_min_condition_similarity": noise_subspace_results["min_similarity"],
+            "pairwise_signal_axes": pairwise_results,
+            "global_signal_axis_summary": global_results,
         }
         random_similarity = noise_subspace_results["random_similarity"]
         if isinstance(random_similarity, dict):
@@ -115,8 +117,6 @@ def main():
         rows.append(row)
         details[eid] = {
             "signal_manifold": signal_manifold_results,
-            "pairwise_signal_axes": pairwise_results,
-            "global_signal_axis_summary": global_results,
             "noise_subspace": noise_subspace_results,
             "unit_ids": unit_ids[unit_mask],
             "condition_trial_counts": {
