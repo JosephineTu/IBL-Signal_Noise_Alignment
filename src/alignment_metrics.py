@@ -159,27 +159,61 @@ def compute_contrast_pair_axes(X, trials, eps=1e-12):
         axes[(cond_a, cond_b)] = u_axis
     return axes
 
-def summarize_contrast_pair_axes(axes, u_global, eps=1e-12):
-    keys = list(axes.keys())
-    out_1 = {}
-    for key_a, key_b in combinations(keys, 2):
-        u_a = axes[key_a]
-        u_b = axes[key_b]
-        cosine_angle = np.dot(u_a, u_b) / (np.linalg.norm(u_a) * np.linalg.norm(u_b) + eps)
-        pair = (key_a, key_b)
-        out_1[pair] = {
-            'abs_cosine_angle': float(np.abs(cosine_angle)),
-        }
+def summarize_contrast_pair_axes(axes, u_global, min_contrast=0.5, eps=1e-12):
+    matched_axes = {}
+    for pair_key, u_axis in axes.items():
+        cond_a, cond_b = pair_key
+        left_a, right_a = cond_a
+        left_b, right_b = cond_b
+        a_is_left = (
+            np.isclose(right_a, 0)
+            and np.isclose(left_b, 0)
+            and np.isclose(left_a, right_b)
+        )
 
+        b_is_left = (
+            np.isclose(right_b, 0)
+            and np.isclose(left_a, 0)
+            and np.isclose(left_b, right_a)
+        )
+        if a_is_left:
+            contrast = float(left_a)
+        elif b_is_left:
+            contrast = float(left_b)
+        else:
+            continue
+        if contrast < min_contrast:
+            continue
+        matched_axes[contrast] = np.asarray(u_axis, float)
+    out_1 = {}
+    for contrast_a, contrast_b in combinations(sorted(matched_axes), 2):
+        u_a = matched_axes[contrast_a]
+        u_b = matched_axes[contrast_b]
+        sim = compute_cosine_similarity(u_a, u_b)
+        out_1[(contrast_a, contrast_b)] = {'abs_cosine': float(np.abs(sim))}
     u_global = np.asarray(u_global, float)
     out_2 = {}
-    for pair_key, u in axes.items():
-        u = np.asarray(u, float)
-        cosine_global = np.dot(u, u_global) / (np.linalg.norm(u) * np.linalg.norm(u_global) + eps)
-        out_2[pair_key] = {
-            'abs_cosine_global': float(np.abs(cosine_global)),
-        }
+    for contrast, u in matched_axes.items():
+        sim = compute_cosine_similarity(u, u_global)
+        out_2[contrast] = {'abs_cosine': float(np.abs(sim))}
     return out_1, out_2
+
+def compute_noise_top1_variance(
+    noise_covariance,
+    n_components=1,
+    eps=1e-12,):
+    C = np.asarray(noise_covariance, dtype=float)
+    eigenvalues, eigenvectors = np.linalg.eigh(C)
+    top_eigenvector = eigenvectors[:, -1]
+    eigenvalues = np.clip(eigenvalues, 0, None)
+    eigenvalues = eigenvalues[::-1]
+    total_variance = np.sum(eigenvalues)
+    if total_variance < eps:
+        return np.full(n_components, np.nan)
+    explained_variance_ratio = (
+        eigenvalues[:n_components] / total_variance
+    )
+    return explained_variance_ratio, top_eigenvector
 
 def signal_noise_alignment(X, signed_contrast, k=3, min_trials=5, eps=1e-12):
     X = np.asarray(X, float)
@@ -212,4 +246,58 @@ def signal_noise_alignment(X, signed_contrast, k=3, min_trials=5, eps=1e-12):
         "k_eff": k_eff,
         "n_eff": n_eff,
     }
+
+def get_eigenspectrum(C, eps=1e-12):
+    C = np.array(C, float)
+    eigenvalues, _ = np.linalg.eigh(C)
+    eigenvalues = np.clip(eigenvalues, 0, None)
+    eigenvalues = eigenvalues[::-1]
+    total_variance = np.sum(eigenvalues)
+    if total_variance < eps:
+        return (np.full_like(eigenvalues, np.nan))
+    explained_variance_ratio = eigenvalues / total_variance
+    pc12_ratio = eigenvalues[0] / eigenvalues[1] if eigenvalues[1] > eps else np.nan
+    return explained_variance_ratio, pc12_ratio
+
+def test_null_eigenspectrum(X, high_mask, pos_mask, neg_mask, n_iter=500, eps=1e-12, seed=0):
+    rng = np.random.default_rng(seed)
+    condition_masks = {
+        'pos': np.asarray(high_mask & pos_mask, dtype=bool),
+        'neg': np.asarray(high_mask & neg_mask, dtype=bool),
+    }
+    R, _, residual_mask = noise_residuals_by_condition(X, condition_masks)
+    residual_mask = np.asarray(residual_mask, dtype=bool)
+    idx_pos = np.flatnonzero(condition_masks['pos'] & residual_mask)
+    idx_neg = np.flatnonzero(condition_masks['neg'] & residual_mask)
+    
+    C_true = compute_noise_covariance(R, residual_mask)
+    _, pc12_true = get_eigenspectrum(C_true, eps=eps)
+    null_ratios = np.empty(n_iter, dtype=float)
+    for iter in range(n_iter):
+        R_null = R.copy()
+        for idx in (idx_pos, idx_neg):
+            for unit in range(R.shape[1]):
+                permuted_idx = rng.permutation(idx)
+                R_null[idx, unit] = R[permuted_idx, unit]
+            
+        C_null = compute_noise_covariance(R_null, residual_mask)
+        _, pc12_null = get_eigenspectrum(C_null, eps=eps)
+        null_ratios[iter] = pc12_null
+        p_value = (np.sum(null_ratios >= pc12_true) + 1) / (n_iter + 1)
+        return{
+            'null_mean': float(np.nanmean(null_ratios)),
+            'pc12_true': float(pc12_true),
+            'p_value': float(p_value),
+        }
+
+
+
+
+
+
+    
+
+
+
+
 

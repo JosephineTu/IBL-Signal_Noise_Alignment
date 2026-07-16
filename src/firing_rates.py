@@ -2,8 +2,8 @@
 import numpy as np
 from brainbox.population.decode import get_spike_counts_in_bins
 
-def compute_static_firing_rates(spikes, stim_on, stim_off, region_cluster_ids, eps=1e-12):
-    stim_intervals = np.c_[stim_on, stim_off]
+def compute_static_firing_rates(spikes, region_cluster_ids, start, end, eps=1e-12):
+    stim_intervals = np.c_[start, end]
     n_trials = stim_intervals.shape[0]
     counts, cluster_ids = get_spike_counts_in_bins(spikes['times'], spikes['clusters'], stim_intervals)
     cluster_ids = np.asarray(cluster_ids)

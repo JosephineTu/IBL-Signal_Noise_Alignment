@@ -31,7 +31,7 @@ def make_contrast_pair_condition_masks(trials, min_trials=5):
     valid_conditions = list(masks.keys())
     return valid_conditions, masks
 
-def get_high_masks(signed_contrast, min_trials=5, threshold=0.5):
+def get_high_masks(signed_contrast, min_trials=5, threshold=0.25):
     high_mask = np.abs(signed_contrast) >= threshold
     if np.sum(high_mask) < min_trials:
         print(f'Warning: only{np.sum(high_mask)} trials above threshold {threshold}')

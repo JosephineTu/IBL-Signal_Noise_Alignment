@@ -7,7 +7,7 @@ import src.ibl_io as ibl_io
 import src.firing_rates as fr
 import src.alignment_metrics as am
 import src.trial_selection as ts
-from itertools import combinations
+# from itertools import combinations
 import numpy as np
 import pandas as pd
 import pickle
@@ -23,7 +23,7 @@ def signal_manifold_overlap(X, condition_masks, pos_mask, neg_mask, n_components
         overlap = float(np.sum((U_k.T @ u_sig) ** 2))
         overlap_by_k[k] = overlap
     # only for plotting
-    _, condition_means, _ = am.noise_residuals_by_condition(X, condition_masks)
+    R, condition_means, _ = am.noise_residuals_by_condition(X, condition_masks)
     condition_order = sorted(condition_means.keys())
     condition_mean_matrix = np.asarray([condition_means[cond] for cond in condition_order], float, )
     condition_mean_centered = condition_mean_matrix - np.mean(condition_mean_matrix, axis=0, keepdims=True)
@@ -36,10 +36,10 @@ def signal_manifold_overlap(X, condition_masks, pos_mask, neg_mask, n_components
             'condition_order': condition_order,
             'condition_mean_scores': condition_mean_scores,}
 
-def compute_signal_axis_pair_similarity(X, trials, u_sig, min_trials=5, eps=1e-12):
-    axes = am.compute_contrast_pair_axes(X, trials, eps=eps)
-    out_pairwise, out_global = am.summarize_contrast_pair_axes(axes, u_sig, eps=eps)
-    return out_pairwise, out_global
+# def compute_signal_axis_pair_similarity(X, trials, u_sig, min_trials=5, eps=1e-12):
+#     axes = am.compute_contrast_pair_axes(X, trials, eps=eps)
+#     out_pairwise, out_global = am.summarize_contrast_pair_axes(axes, u_sig, eps=eps)
+#     return out_pairwise, out_global
 
 def noise_subspace_similarity(X, condition_masks, k=3, eps=1e-12):
     noise_subspace_similarities, mean_similarity, min_similarity, trial_counts = am.condition_noise_subspaces(X, condition_masks, k=k, eps=eps)
@@ -69,19 +69,28 @@ def main():
         best_pid = ibl_io.pick_best_insertion(one=one, atlas=atlas, eid=eid, target_prefix="VISp")
         spikes, clusters = ibl_io.load_spikes_and_clusters(one=one, pid=best_pid, atlas=atlas)
         region_cluster_ids = ibl_io.get_region_cluster_ids(clusters, target_prefix="VISp")
-        stim_on = trials['stimOn_times']
-        stim_off = trials['stimOff_times']
-        X, unit_ids = fr.compute_static_firing_rates(spikes, stim_on, stim_off, region_cluster_ids)
+        start = np.asarray(trials["stimOn_times"], dtype=float)
+        start = start + 0.04 # VISp maximal population trajectory distance and modulation latency
+        end = start + 0.1 # try out 100 ms time window
+        X, unit_ids = fr.compute_static_firing_rates(spikes, region_cluster_ids, start=start, end=end)
         X_filtered, unit_mask = fr.filter_active_units(X, eps=1e-10, min_units=5)
 
         signed_contrast = ts.get_signed_contrast(trials)
         condition_masks = ts.make_condition_masks(signed_contrast, min_trials=5)
         high_mask = ts.get_high_masks(signed_contrast, min_trials=5, threshold=0.5)
         pos_mask, neg_mask = ts.get_pos_neg_masks(signed_contrast, high_mask=high_mask, min_trials=5)
-        
+        R, condition_means, residual_mask = am.noise_residuals_by_condition(X_filtered, condition_masks)
+        noise_covariance_high = am.compute_noise_covariance(R, high_mask)
+        noise_top_variance, a = am.compute_noise_top1_variance(noise_covariance_high, n_components=1)
+        effective_units = 1.0 / np.sum(a ** 4)
+        null_eigenspectrum_results = am.test_null_eigenspectrum(X_filtered, high_mask, pos_mask, neg_mask, n_iter=500, eps=1e-12, seed=0)
+        true_ratio = null_eigenspectrum_results['pc12_true']
+        null_mean_ratio = null_eigenspectrum_results['null_mean']
+        p_val = null_eigenspectrum_results['p_value']
+        max_loading_sq = np.max(a ** 2)
         signal_manifold_results = signal_manifold_overlap(X_filtered, condition_masks, pos_mask, neg_mask, n_components=3)
         u_sig = signal_manifold_results['u_sig']
-        pairwise_results, global_results = compute_signal_axis_pair_similarity(X_filtered, trials, u_sig, min_trials=5, eps=1e-12)
+        # pairwise_results, global_results = compute_signal_axis_pair_similarity(X_filtered, trials, u_sig, min_trials=5, eps=1e-12)
         noise_subspace_results = noise_subspace_similarity(X_filtered, condition_masks, k=3, eps=1e-12)
         evr = np.asarray(signal_manifold_results['explained_variance_ratio'], float,)
         overlap = signal_manifold_results['overlap_by_k']
@@ -105,8 +114,13 @@ def main():
 
             "noise_mean_condition_similarity": noise_subspace_results["mean_similarity"],
             "noise_min_condition_similarity": noise_subspace_results["min_similarity"],
-            "pairwise_signal_axes": pairwise_results,
-            "global_signal_axis_summary": global_results,
+            # "pairwise_signal_axes": pairwise_results,
+            # "global_signal_axis_summary": global_results,
+            "noise_top1_variance": noise_top_variance,
+            "effective_units": effective_units,
+            "max_loading_sq": max_loading_sq,
+            "noise_pc12_ratio": true_ratio,
+            "pc12_null_pval": p_val,
         }
         random_similarity = noise_subspace_results["random_similarity"]
         if isinstance(random_similarity, dict):
