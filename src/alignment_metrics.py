@@ -285,12 +285,40 @@ def test_null_eigenspectrum(X, high_mask, pos_mask, neg_mask, n_iter=500, eps=1e
         null_ratios[iter] = pc12_null
         p_value = (np.sum(null_ratios >= pc12_true) + 1) / (n_iter + 1)
         return{
+            'R_null': R_null,
+            'idx_pos': idx_pos,
+            'idx_neg': idx_neg,
             'null_mean': float(np.nanmean(null_ratios)),
             'pc12_true': float(pc12_true),
             'p_value': float(p_value),
         }
 
-
+def null_a_similarity(R, pos_mask, neg_mask, true_similarity, n_iter=500, seed=0):
+    rng = np.random.default_rng(seed)
+    valid_mask = pos_mask | neg_mask
+    valid_idx = np.flatnonzero(valid_mask)
+    n_pos = int(np.sum(pos_mask))
+    n_neg = int(np.sum(neg_mask))
+    samples = []
+    for _ in range(n_iter):
+        shuffled_idx = rng.permutation(valid_idx)
+        pos_idx = shuffled_idx[:n_pos]
+        neg_idx = shuffled_idx[n_pos:n_pos + n_neg]
+        pos_mask_null = np.zeros(R.shape[0], dtype=bool)
+        neg_mask_null = np.zeros(R.shape[0], dtype=bool)
+        pos_mask_null[pos_idx] = True
+        neg_mask_null[neg_idx] = True
+        C_pos_null = compute_noise_covariance(R, pos_mask_null)
+        C_neg_null = compute_noise_covariance(R, neg_mask_null)
+        _, a_pos_1 = compute_noise_top1_variance(C_pos_null, n_components=1)
+        _, a_neg_1 = compute_noise_top1_variance(C_neg_null, n_components=1)
+        sim_null = float((a_pos_1 @ a_neg_1) ** 2)
+        samples.append(sim_null)
+    p_val = (np.sum(np.array(samples) >= true_similarity) + 1) / (n_iter + 1) 
+    return {
+        'samples': samples,
+        'p_value': p_val,
+    }
 
 
 

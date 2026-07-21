@@ -79,6 +79,8 @@ def main():
         condition_masks = ts.make_condition_masks(signed_contrast, min_trials=5)
         high_mask = ts.get_high_masks(signed_contrast, min_trials=5, threshold=0.5)
         pos_mask, neg_mask = ts.get_pos_neg_masks(signed_contrast, high_mask=high_mask, min_trials=5)
+        pos_1_mask = high_mask & pos_mask
+        neg_1_mask = high_mask & neg_mask
         R, condition_means, residual_mask = am.noise_residuals_by_condition(X_filtered, condition_masks)
         noise_covariance_high = am.compute_noise_covariance(R, high_mask)
         noise_top_variance, a = am.compute_noise_top1_variance(noise_covariance_high, n_components=1)
@@ -88,6 +90,13 @@ def main():
         null_mean_ratio = null_eigenspectrum_results['null_mean']
         p_val = null_eigenspectrum_results['p_value']
         max_loading_sq = np.max(a ** 2)
+        pos_1_covariance = am.compute_noise_covariance(R, pos_1_mask)
+        neg_1_covariance = am.compute_noise_covariance(R, neg_1_mask)
+        _, a_pos_1 = am.compute_noise_top1_variance(pos_1_covariance, n_components=1)
+        _, a_neg_1 = am.compute_noise_top1_variance(neg_1_covariance, n_components=1)
+        a_similarity = float(np.sum((a_pos_1.T @ a_neg_1) ** 2))
+        null_a_results = am.null_a_similarity(R, pos_mask, neg_mask, a_similarity, n_iter=500, seed=0)
+        null_a_p_val = null_a_results['p_value']
         signal_manifold_results = signal_manifold_overlap(X_filtered, condition_masks, pos_mask, neg_mask, n_components=3)
         u_sig = signal_manifold_results['u_sig']
         # pairwise_results, global_results = compute_signal_axis_pair_similarity(X_filtered, trials, u_sig, min_trials=5, eps=1e-12)
@@ -121,6 +130,8 @@ def main():
             "max_loading_sq": max_loading_sq,
             "noise_pc12_ratio": true_ratio,
             "pc12_null_pval": p_val,
+            "a_similarity": a_similarity,
+            "null_a_p_val": null_a_p_val,
         }
         random_similarity = noise_subspace_results["random_similarity"]
         if isinstance(random_similarity, dict):
