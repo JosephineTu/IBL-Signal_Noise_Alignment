@@ -102,7 +102,7 @@ def main():
 
     parser.add_argument(
         "--summary-csv",
-        default=None,
+        default="/home/xiaorantu/signal_noise_alignment/results/timebinned_alignment/t0p04to0p14_bin0p05_step0p01_k3_timebinned_alignment_summary.csv",
         help="Single summary CSV. Kept for backward compatibility.",
     )
 
@@ -158,7 +158,7 @@ def main():
         summary_csv = Path(args.summary_csv)
 
         if args.out_dir is None:
-            out_dir = Path("figures/figure_5")
+            out_dir = Path("figure_5")
         else:
             out_dir = Path(args.out_dir)
 

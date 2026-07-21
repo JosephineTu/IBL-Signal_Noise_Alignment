@@ -7,6 +7,7 @@ import src.ibl_io as ibl_io
 import src.firing_rates as fr
 import src.alignment_metrics as am
 import src.trial_selection as ts
+import src.prestim as prestim
 # from itertools import combinations
 import numpy as np
 import pandas as pd
@@ -69,8 +70,8 @@ def main():
         best_pid = ibl_io.pick_best_insertion(one=one, atlas=atlas, eid=eid, target_prefix="VISp")
         spikes, clusters = ibl_io.load_spikes_and_clusters(one=one, pid=best_pid, atlas=atlas)
         region_cluster_ids = ibl_io.get_region_cluster_ids(clusters, target_prefix="VISp")
-        start = np.asarray(trials["stimOn_times"], dtype=float)
-        start = start + 0.04 # VISp maximal population trajectory distance and modulation latency
+        stim_on = np.asarray(trials["stimOn_times"], dtype=float)
+        start = stim_on + 0.04 # VISp maximal population trajectory distance and modulation latency
         end = start + 0.1 # try out 100 ms time window
         X, unit_ids = fr.compute_static_firing_rates(spikes, region_cluster_ids, start=start, end=end)
         X_filtered, unit_mask = fr.filter_active_units(X, eps=1e-10, min_units=5)
@@ -82,6 +83,9 @@ def main():
         pos_1_mask = high_mask & pos_mask
         neg_1_mask = high_mask & neg_mask
         R, condition_means, residual_mask = am.noise_residuals_by_condition(X_filtered, condition_masks)
+        prestim_R, _ = prestim.get_prestim_residuals(spikes, region_cluster_ids, stim_on, condition_masks, unit_mask, lapse=0.1, eps=1e-12)
+        prestim_noise_covariance_high = am.compute_noise_covariance(prestim_R, high_mask)
+        prestim_noise_top_variance, prestim_a = am.compute_noise_top1_variance(prestim_noise_covariance_high, n_components=1)   
         noise_covariance_high = am.compute_noise_covariance(R, high_mask)
         noise_top_variance, a = am.compute_noise_top1_variance(noise_covariance_high, n_components=1)
         effective_units = 1.0 / np.sum(a ** 4)
@@ -103,7 +107,7 @@ def main():
         noise_subspace_results = noise_subspace_similarity(X_filtered, condition_masks, k=3, eps=1e-12)
         evr = np.asarray(signal_manifold_results['explained_variance_ratio'], float,)
         overlap = signal_manifold_results['overlap_by_k']
-    
+        prestim_a_cosine_similarity = float(np.sum((prestim_a.T @ a) ** 2))
         row = {
             "eid": eid,
             "pid": best_pid,
@@ -132,6 +136,7 @@ def main():
             "pc12_null_pval": p_val,
             "a_similarity": a_similarity,
             "null_a_p_val": null_a_p_val,
+            "prestim_a_cosine_similarity": prestim_a_cosine_similarity,
         }
         random_similarity = noise_subspace_results["random_similarity"]
         if isinstance(random_similarity, dict):

@@ -230,12 +230,14 @@ def signal_noise_alignment(X, signed_contrast, k=3, min_trials=5, eps=1e-12):
     noise_mask = pos_mask | neg_mask
     C = compute_noise_covariance(R, noise_mask)
     U_k, evals_k = top_noise_subspace(C, k=k)
+    a = U_k[:, 0]
     overlap_topk = float(np.sum((U_k.T @ u_sig) ** 2))
-    cosine2_top1 = float((U_k[:, 0] @ u_sig) ** 2)
+    cosine2_top1 = float((a @ u_sig) ** 2)
     k_eff = U_k.shape[1]
     n_eff = U_k.shape[0]
     expected_random_overlap = k_eff / n_eff
     expected_random_cosine2 = 1 / n_eff
+    pval, _ = null_signal_noise_alignment(a, u_sig, cosine2_top1)
     return{
         'n_pos': n_pos,
         'n_neg': n_neg,
@@ -245,7 +247,21 @@ def signal_noise_alignment(X, signed_contrast, k=3, min_trials=5, eps=1e-12):
         'expected_random_cosine2': expected_random_cosine2,
         "k_eff": k_eff,
         "n_eff": n_eff,
+        'noise_a': a,
+        'u_sig': u_sig,
+        'null_pval': pval,
     }
+
+def null_signal_noise_alignment(a, u_sig, cosine2_top1, n_perm=5000, seed=0):
+    rng = np.random.default_rng(seed)
+    n_eff = a.shape[0]
+    null_cosine2 = np.empty(n_perm, dtype=float)
+    for i in range(n_perm):
+        draw = rng.permutation(n_eff)
+        a_null = a[draw]
+        null_cosine2[i] = float((a_null @ u_sig) ** 2)
+    p_val = (np.sum(null_cosine2 >= cosine2_top1) + 1) / (n_perm + 1)
+    return p_val, null_cosine2
 
 def get_eigenspectrum(C, eps=1e-12):
     C = np.array(C, float)
