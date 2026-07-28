@@ -99,7 +99,7 @@ def main():
         _, a_pos_1 = am.compute_noise_top1_variance(pos_1_covariance, n_components=1)
         _, a_neg_1 = am.compute_noise_top1_variance(neg_1_covariance, n_components=1)
         a_similarity = float(np.sum((a_pos_1.T @ a_neg_1) ** 2))
-        null_a_results = am.null_a_similarity(R, pos_mask, neg_mask, a_similarity, n_iter=500, seed=0)
+        null_a_results = am.null_a_similarity(a_pos_1, a_neg_1, n_iter=1000, seed=0)
         null_a_p_val = null_a_results['p_value']
         signal_manifold_results = signal_manifold_overlap(X_filtered, condition_masks, pos_mask, neg_mask, n_components=3)
         u_sig = signal_manifold_results['u_sig']

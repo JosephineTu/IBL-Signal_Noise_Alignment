@@ -34,7 +34,7 @@ def noise_residuals_by_condition(X, condition_masks):
 def compute_noise_covariance(R, residual_mask):
     R = np.asarray(R, float)
     R = R[residual_mask]
-    lw = LedoitWolf(store_precision=False, assume_centered=True)
+    lw = LedoitWolf(store_precision=False, assume_centered=False)
     lw.fit(R)
     C = lw.covariance_
     C = np.nan_to_num(C, nan=0.0, posinf=0.0, neginf=0.0)
@@ -86,7 +86,7 @@ def condition_noise_subspaces(X, condition_masks, k=3, min_trials=10, eps=1e-12)
     trial_counts = {cond: int(np.sum(mask)) for cond, mask in condition_masks.items()}
     return noise_subspace_similarities, mean_similarity, min_similarity, trial_counts
 
-def random_subspace_similarity(X, condition_masks, k=3, n_iter=100, eps=1e-12, seed=0):
+def random_subspace_similarity(X, condition_masks, k=3, n_iter=100, min_trials=10,eps=1e-12, seed=0):
     rng = np.random.default_rng(seed)
     R, _, residual_mask = noise_residuals_by_condition(X, condition_masks)
     valid_idx = np.flatnonzero(residual_mask)
@@ -275,7 +275,7 @@ def get_eigenspectrum(C, eps=1e-12):
     pc12_ratio = eigenvalues[0] / eigenvalues[1] if eigenvalues[1] > eps else np.nan
     return explained_variance_ratio, pc12_ratio
 
-def test_null_eigenspectrum(X, high_mask, pos_mask, neg_mask, n_iter=500, eps=1e-12, seed=0):
+def test_null_eigenspectrum(X, high_mask, pos_mask, neg_mask, n_iter=1000, eps=1e-12, seed=0):
     rng = np.random.default_rng(seed)
     condition_masks = {
         'pos': np.asarray(high_mask & pos_mask, dtype=bool),
@@ -288,53 +288,45 @@ def test_null_eigenspectrum(X, high_mask, pos_mask, neg_mask, n_iter=500, eps=1e
     
     C_true = compute_noise_covariance(R, residual_mask)
     _, pc12_true = get_eigenspectrum(C_true, eps=eps)
-    null_ratios = np.empty(n_iter, dtype=float)
+    null_ratios = np.full(n_iter, np.nan)
     for iter in range(n_iter):
         R_null = R.copy()
         for idx in (idx_pos, idx_neg):
             for unit in range(R.shape[1]):
                 permuted_idx = rng.permutation(idx)
                 R_null[idx, unit] = R[permuted_idx, unit]
-            
         C_null = compute_noise_covariance(R_null, residual_mask)
-        _, pc12_null = get_eigenspectrum(C_null, eps=eps)
-        null_ratios[iter] = pc12_null
-        p_value = (np.sum(null_ratios >= pc12_true) + 1) / (n_iter + 1)
-        return{
-            'R_null': R_null,
-            'idx_pos': idx_pos,
-            'idx_neg': idx_neg,
-            'null_mean': float(np.nanmean(null_ratios)),
-            'pc12_true': float(pc12_true),
-            'p_value': float(p_value),
-        }
-
-def null_a_similarity(R, pos_mask, neg_mask, true_similarity, n_iter=500, seed=0):
-    rng = np.random.default_rng(seed)
-    valid_mask = pos_mask | neg_mask
-    valid_idx = np.flatnonzero(valid_mask)
-    n_pos = int(np.sum(pos_mask))
-    n_neg = int(np.sum(neg_mask))
-    samples = []
-    for _ in range(n_iter):
-        shuffled_idx = rng.permutation(valid_idx)
-        pos_idx = shuffled_idx[:n_pos]
-        neg_idx = shuffled_idx[n_pos:n_pos + n_neg]
-        pos_mask_null = np.zeros(R.shape[0], dtype=bool)
-        neg_mask_null = np.zeros(R.shape[0], dtype=bool)
-        pos_mask_null[pos_idx] = True
-        neg_mask_null[neg_idx] = True
-        C_pos_null = compute_noise_covariance(R, pos_mask_null)
-        C_neg_null = compute_noise_covariance(R, neg_mask_null)
-        _, a_pos_1 = compute_noise_top1_variance(C_pos_null, n_components=1)
-        _, a_neg_1 = compute_noise_top1_variance(C_neg_null, n_components=1)
-        sim_null = float((a_pos_1 @ a_neg_1) ** 2)
-        samples.append(sim_null)
-    p_val = (np.sum(np.array(samples) >= true_similarity) + 1) / (n_iter + 1) 
-    return {
-        'samples': samples,
-        'p_value': p_val,
+        _, null_ratios[iter] = get_eigenspectrum(C_null, eps=eps)
+    valid = np.isfinite(null_ratios)
+    p_val = (1 + np.count_nonzero(null_ratios[valid] >= pc12_true)) / (1 + np.sum(valid))
+    return{
+        'pc12_true': float(pc12_true),
+        'null_ratios': null_ratios,
+        'p_value': float(p_val),
+        'null_mean': np.mean(null_ratios[valid]),
     }
+
+def null_a_similarity(a_pos, a_neg, n_iter=1000, seed=0):
+    rng = np.random.default_rng(seed)
+    a_pos = np.asarray(a_pos, float)
+    a_neg = np.asarray(a_neg, float)
+    a_pos = a_pos / np.linalg.norm(a_pos)
+    a_neg = a_neg / np.linalg.norm(a_neg)
+    observed = float((a_pos @ a_neg) ** 2)
+    n_units = a_pos.shape[0]
+    null_samples = np.empty(n_iter, dtype=float)
+    for i in range(n_iter):
+        draw = rng.permutation(n_units)
+        a_neg_null = a_neg[draw]
+        null_samples[i] = float((a_neg_null @ a_pos) ** 2)
+    p_value = (1 + np.count_nonzero(null_samples >= observed)) / (1 + n_iter)
+    return{
+        'observed': observed,
+        'samples': null_samples,
+        'p_value': p_value,
+    }
+
+
 
 
 
