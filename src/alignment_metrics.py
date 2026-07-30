@@ -237,7 +237,7 @@ def signal_noise_alignment(X, signed_contrast, k=3, min_trials=5, eps=1e-12):
     n_eff = U_k.shape[0]
     expected_random_overlap = k_eff / n_eff
     expected_random_cosine2 = 1 / n_eff
-    pval, _ = null_signal_noise_alignment(a, u_sig, cosine2_top1)
+    pval, null_cosine_2 = null_signal_noise_alignment(a, u_sig, cosine2_top1)
     return{
         'n_pos': n_pos,
         'n_neg': n_neg,
@@ -250,6 +250,7 @@ def signal_noise_alignment(X, signed_contrast, k=3, min_trials=5, eps=1e-12):
         'noise_a': a,
         'u_sig': u_sig,
         'null_pval': pval,
+        'null_cosine2': null_cosine_2,
     }
 
 def null_signal_noise_alignment(a, u_sig, cosine2_top1, n_perm=5000, seed=0):

@@ -15,9 +15,9 @@ import src.trial_selection as ts
 import src.firing_rates as fr
 from src.time_bin import run_timebinned_metric
 
-def run_one_eid(one, atlas, eid, target_prefix='VISp', 
-                t_start=0.0, t_end=0.4, bin_size=0.08, 
-                step_size=0.02, k=3, min_trials=5, 
+def run_one_eid(one, atlas, eid,  
+                t_start, t_end, bin_size, 
+                step_size, k=3, min_trials=5, target_prefix='VISp',
                 output_dir=Path('results/timebinned_alignment'),):
     print(f'Processing {eid}...')
     trials = ibl_io.load_trials(one, eid)
@@ -92,13 +92,13 @@ def main():
         default="results/timebinned_alignment",
     )
     parser.add_argument("--target-prefix", default="VISp")
-    parser.add_argument("--t-start", type=float, default=0.0)
-    parser.add_argument("--t-end", type=float, default=0.4)
-    parser.add_argument("--bin-size", type=float, default=0.08)
-    parser.add_argument("--step-size", type=float, default=0.02)
+    parser.add_argument("--t-start", type=float, default=0.04)
+    parser.add_argument("--t-end", type=float, default=0.14)
+    parser.add_argument("--bin-size", type=float, default=0.05)
+    parser.add_argument("--step-size", type=float, default=0.01)
     parser.add_argument("--k", type=int, default=3)
     parser.add_argument("--min-trials", type=int, default=5)
-    parser.add_argument("--max-sessions", type=int, default=5)
+    parser.add_argument("--max-sessions", type=int, default=10)
     parser.add_argument("--session-index", type=int, default=None)
     args = parser.parse_args()
     one = ibl_io.one_setup(cache_dir=args.cache_dir)
@@ -119,12 +119,12 @@ def main():
                 one=one,
                 atlas=atlas,
                 eid=eid,
-                target_prefix=args.target_prefix,
                 t_start=args.t_start,
                 t_end=args.t_end,
                 bin_size=args.bin_size,
                 step_size=args.step_size,
                 k=args.k,
+                target_prefix=args.target_prefix,
                 min_trials=args.min_trials,
                 output_dir=output_dir,
             )
@@ -159,6 +159,14 @@ def main():
     print(f"Saved details to {details_pkl}")
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
 
 
 
