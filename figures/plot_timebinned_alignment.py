@@ -466,10 +466,7 @@ def main():
     parser.add_argument(
         "--summary-csv",
         default=(
-            "/home/xiaorantu/signal_noise_alignment/"
-            "results/timebinned_alignment/"
-            "t0p0to0p1_bin0p03_step0p01_k3"
-            "_timebinned_alignment_summary.csv"
+        "/home/xiaorantu/signal_noise_alignment/results/timebinned_alignment/VISl/t0p0to0p1_bin0p03_step0p01_k3_timebinned_alignment_summary.csv"
         ),
         help="Summary CSV for single-summary mode.",
     )
@@ -544,6 +541,8 @@ def main():
             out_dir = (
                 out_root / f"figure_5_{index}"
             )
+            out_dir = Path(out_dir)
+            out_dir.mkdir(parents=True, exist_ok=True)
 
             print(
                 f"\n[{index}/{len(summary_files)}] "
@@ -559,11 +558,7 @@ def main():
 
     else:
         summary_csv = Path(args.summary_csv)
-
-        if args.out_dir is None:
-            out_dir = Path("figure_5")
-        else:
-            out_dir = Path(args.out_dir)
+        out_dir = Path(args.out_dir) if args.out_dir else summary_csv.parent
 
         plot_one_summary(
             summary_csv=summary_csv,
