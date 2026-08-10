@@ -12,6 +12,7 @@ import src.prestim as prestim
 import numpy as np
 import pandas as pd
 import pickle
+import argparse
 from iblatlas.atlas import AllenAtlas 
 
 def signal_manifold_overlap(X, condition_masks, pos_mask, neg_mask, n_components=3):
@@ -53,23 +54,68 @@ def noise_subspace_similarity(X, condition_masks, k=3, eps=1e-12):
         'trial_counts': trial_counts,
     }
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run condition-geometry analysis for one brain region."
+    )
+    parser.add_argument(
+        "--target-prefix",
+        required=True,
+        help="Allen region acronym or prefix, for example VISp or VISl.",
+    )
+    return parser.parse_args()
+
 def main():
-    one = ibl_io.one_setup(cache_dir="/scratch/midway3/xiaorantu/ONE")
-    data_path = REPO_ROOT / "results" / "VISp_subjects_by_lab.json"
+    args = parse_args()
+    target_prefix = args.target_prefix.strip()
+    if not target_prefix:
+        raise ValueError("--target-prefix cannot be empty")
+    if Path(target_prefix).name != target_prefix:
+        raise ValueError(
+            f"Invalid --target-prefix path component: {target_prefix!r}"
+        )
+    one = ibl_io.one_setup(
+        cache_dir="/scratch/midway3/xiaorantu/ONE"
+    )
+    data_dir = (
+        REPO_ROOT
+        / "results"
+        / "region_scan"
+        / target_prefix
+    )
+    data_path = (
+        data_dir
+        / f"{target_prefix}_subjects_by_lab.json"
+    )
+
+    if not data_path.is_file():
+        raise FileNotFoundError(
+            f"Region-scan input JSON not found: {data_path}"
+        )
     eids = ibl_io.build_eids_from_results(data_path)
-    eids_to_run = eids[:5]
+    eids_to_run = eids[:9]
     atlas = AllenAtlas()
     rows = []
     details = {}
-    output_dir = Path("results/condition_geometry")
+
+    output_dir = (
+        REPO_ROOT
+        / "results"
+        / "condition_geometry"
+        / target_prefix
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
+    print(f"Target prefix: {target_prefix}")
+    print(f"Input JSON: {data_path}")
+    print(f"Output directory: {output_dir}")
+    print(f"Number of selected EIDs: {len(eids_to_run)}")
 
     for eid in eids_to_run:
         print(f'Processing eid: {eid}')
         trials = ibl_io.load_trials(one=one, eid=eid)
-        best_pid = ibl_io.pick_best_insertion(one=one, atlas=atlas, eid=eid, target_prefix="VISp")
+        best_pid = ibl_io.pick_best_insertion(one=one, atlas=atlas, eid=eid, target_prefix=target_prefix)
         spikes, clusters = ibl_io.load_spikes_and_clusters(one=one, pid=best_pid, atlas=atlas)
-        region_cluster_ids = ibl_io.get_region_cluster_ids(clusters, target_prefix="VISp")
+        region_cluster_ids = ibl_io.get_region_cluster_ids(clusters, target_prefix=target_prefix)
         stim_on = np.asarray(trials["stimOn_times"], dtype=float)
         start = stim_on + 0.04 # VISp maximal population trajectory distance and modulation latency
         end = start + 0.1 # try out 100 ms time window
@@ -93,6 +139,7 @@ def main():
         true_ratio = null_eigenspectrum_results['pc12_true']
         null_mean_ratio = null_eigenspectrum_results['null_mean']
         p_val = null_eigenspectrum_results['p_value']
+        eigenspectrum = null_eigenspectrum_results['eigenspectrum']
         max_loading_sq = np.max(a ** 2)
         pos_1_covariance = am.compute_noise_covariance(R, pos_1_mask)
         neg_1_covariance = am.compute_noise_covariance(R, neg_1_mask)
@@ -134,6 +181,7 @@ def main():
             "max_loading_sq": max_loading_sq,
             "noise_pc12_ratio": true_ratio,
             "pc12_null_pval": p_val,
+            "eigenspectrum": eigenspectrum,
             "a_similarity": a_similarity,
             "null_a_p_val": null_a_p_val,
             "prestim_a_cosine_similarity": prestim_a_cosine_similarity,

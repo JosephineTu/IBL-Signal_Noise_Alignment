@@ -274,7 +274,7 @@ def get_eigenspectrum(C, eps=1e-12):
         return (np.full_like(eigenvalues, np.nan))
     explained_variance_ratio = eigenvalues / total_variance
     pc12_ratio = eigenvalues[0] / eigenvalues[1] if eigenvalues[1] > eps else np.nan
-    return explained_variance_ratio, pc12_ratio
+    return explained_variance_ratio, pc12_ratio, eigenvalues
 
 def test_null_eigenspectrum(X, high_mask, pos_mask, neg_mask, n_iter=1000, eps=1e-12, seed=0):
     rng = np.random.default_rng(seed)
@@ -288,7 +288,7 @@ def test_null_eigenspectrum(X, high_mask, pos_mask, neg_mask, n_iter=1000, eps=1
     idx_neg = np.flatnonzero(condition_masks['neg'] & residual_mask)
     
     C_true = compute_noise_covariance(R, residual_mask)
-    _, pc12_true = get_eigenspectrum(C_true, eps=eps)
+    _, pc12_true, eigenspectrum = get_eigenspectrum(C_true, eps=eps)
     null_ratios = np.full(n_iter, np.nan)
     for iter in range(n_iter):
         R_null = R.copy()
@@ -297,7 +297,7 @@ def test_null_eigenspectrum(X, high_mask, pos_mask, neg_mask, n_iter=1000, eps=1
                 permuted_idx = rng.permutation(idx)
                 R_null[idx, unit] = R[permuted_idx, unit]
         C_null = compute_noise_covariance(R_null, residual_mask)
-        _, null_ratios[iter] = get_eigenspectrum(C_null, eps=eps)
+        _, null_ratios[iter],_ = get_eigenspectrum(C_null, eps=eps)
     valid = np.isfinite(null_ratios)
     p_val = (1 + np.count_nonzero(null_ratios[valid] >= pc12_true)) / (1 + np.sum(valid))
     return{
@@ -305,6 +305,7 @@ def test_null_eigenspectrum(X, high_mask, pos_mask, neg_mask, n_iter=1000, eps=1
         'null_ratios': null_ratios,
         'p_value': float(p_val),
         'null_mean': np.mean(null_ratios[valid]),
+        'eigenspectrum': eigenspectrum,
     }
 
 def null_a_similarity(a_pos, a_neg, n_iter=1000, seed=0):

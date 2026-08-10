@@ -2,7 +2,7 @@
   "cortexlab": {
     "KS014": {
       "n_VIS_sessions": 2,
-      "VIS_eids": [
+      "region_eids": [
         "b9c205c3-feac-485b-a89d-afc96d9cb280",
         "e1931de1-cf7b-49af-af33-2ade15e8abe7"
       ],
@@ -17,7 +17,7 @@
     },
     "KS042": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "07dc4b76-5b93-4a03-82a0-b3d9cc73f412"
       ],
       "VIS_acronyms": [
@@ -26,7 +26,7 @@
     },
     "KS046": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "aa3432cd-62bd-40bc-bc1c-a12d53bcbdcf"
       ],
       "VIS_acronyms": [
@@ -40,7 +40,7 @@
     },
     "KS055": {
       "n_VIS_sessions": 2,
-      "VIS_eids": [
+      "region_eids": [
         "872ce8ff-9fb3-485c-be00-bc5479e0095b",
         "b22f694e-4a34-4142-ab9d-2556c3487086"
       ],
@@ -54,7 +54,7 @@
   "wittenlab": {
     "ibl_witten_20": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "a7763417-e0d6-4f2a-aa55-e382fd9b5fb8"
       ],
       "VIS_acronyms": [
@@ -67,7 +67,7 @@
     },
     "ibl_witten_26": {
       "n_VIS_sessions": 2,
-      "VIS_eids": [
+      "region_eids": [
         "dc21e80d-97d7-44ca-a729-a8e3f9b14305",
         "09394481-8dd2-4d5c-9327-f2753ede92d7"
       ],
@@ -80,7 +80,7 @@
     },
     "ibl_witten_29": {
       "n_VIS_sessions": 2,
-      "VIS_eids": [
+      "region_eids": [
         "58b1e920-cfc8-467e-b28b-7654a55d0977",
         "86b6ba67-c1db-4333-add0-f8105ea6e363"
       ],
@@ -96,7 +96,7 @@
     },
     "ibl_witten_27": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "952870e5-f2a7-4518-9e6d-71585460f6fe"
       ],
       "VIS_acronyms": [
@@ -111,7 +111,7 @@
   "hausserlab": {
     "PL050": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "2584ce3c-db10-4076-89cb-5d313138dd38"
       ],
       "VIS_acronyms": [
@@ -124,7 +124,7 @@
     },
     "PL015": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "9a6e127b-bb07-4be2-92e2-53dd858c2762"
       ],
       "VIS_acronyms": [
@@ -135,7 +135,7 @@
   "steinmetzlab": {
     "NR_0019": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "b887df2c-bb9c-44c9-a9c0-538da87b2cab"
       ],
       "VIS_acronyms": [
@@ -144,7 +144,7 @@
     },
     "NR_0020": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "d901aff5-2250-467a-b4a1-0cb9729df9e2"
       ],
       "VIS_acronyms": [
@@ -157,7 +157,7 @@
     },
     "NR_0021": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "e0928e11-2b86-4387-a203-80c77fab5d52"
       ],
       "VIS_acronyms": [
@@ -171,7 +171,7 @@
     },
     "NR_0024": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "7cc74598-9c1b-436b-84fa-0bf89f31adf6"
       ],
       "VIS_acronyms": [
@@ -180,7 +180,7 @@
     },
     "NR_0028": {
       "n_VIS_sessions": 2,
-      "VIS_eids": [
+      "region_eids": [
         "5c0c560e-9e1f-45e9-b66e-e4ee7855be84",
         "f56194bc-8215-4ae8-bc6a-89781ad8e050"
       ],
@@ -199,7 +199,7 @@
     },
     "NR_0031": {
       "n_VIS_sessions": 2,
-      "VIS_eids": [
+      "region_eids": [
         "642c97ea-fe89-4ec9-8629-5e492ea4019d",
         "caa5dddc-9290-4e27-9f5e-575ba3598614"
       ],
@@ -217,7 +217,7 @@
   "mainenlab": {
     "ZFM-01576": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "c4432264-e1ae-446f-8a07-6280abade813"
       ],
       "VIS_acronyms": [
@@ -228,7 +228,7 @@
     },
     "ZFM-01577": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "09b2c4d1-058d-4c84-9fd4-97530f85baf6"
       ],
       "VIS_acronyms": [
@@ -241,7 +241,7 @@
     },
     "ZFM-04308": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "239dd3c9-35f3-4462-95ee-91b822a22e6b"
       ],
       "VIS_acronyms": [
@@ -257,7 +257,7 @@
   "churchlandlab_ucla": {
     "MFD_05": {
       "n_VIS_sessions": 2,
-      "VIS_eids": [
+      "region_eids": [
         "7dd27c2f-9544-448d-918d-be0f9837b0e0",
         "ca4ecb4c-4b60-4723-9b9e-2c54a6290a53"
       ],
@@ -272,7 +272,7 @@
     },
     "MFD_06": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "3f71aa98-08c6-4e79-b4c8-00eae4f03eff"
       ],
       "VIS_acronyms": [
@@ -283,7 +283,7 @@
     },
     "MFD_08": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "5ae68c54-2897-4d3a-8120-426150704385"
       ],
       "VIS_acronyms": [
@@ -297,7 +297,7 @@
     },
     "UCLA015": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "0c828385-6dd6-4842-a702-c5075f5f5e81"
       ],
       "VIS_acronyms": [
@@ -309,7 +309,7 @@
     },
     "UCLA017": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "bb099402-fb31-4cfd-824e-1c97530a0875"
       ],
       "VIS_acronyms": [
@@ -321,7 +321,7 @@
     },
     "UCLA033": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "111c1762-7908-47e0-9f40-2f2ee55b6505"
       ],
       "VIS_acronyms": [
@@ -332,7 +332,7 @@
     },
     "UCLA034": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "8a3a0197-b40a-449f-be55-c00b23253bbf"
       ],
       "VIS_acronyms": [
@@ -344,7 +344,7 @@
     },
     "UCLA037": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "bda2faf5-9563-4940-a80f-ce444259e47b"
       ],
       "VIS_acronyms": [
@@ -357,7 +357,7 @@
     },
     "UCLA044": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "91bac580-76ed-41ab-ac07-89051f8d7f6e"
       ],
       "VIS_acronyms": [
@@ -371,7 +371,7 @@
     },
     "UCLA049": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "8a1cf4ef-06e3-4c72-9bc7-e1baa189841b"
       ],
       "VIS_acronyms": [
@@ -383,7 +383,7 @@
   "mrsicflogellab": {
     "SWC_052": {
       "n_VIS_sessions": 2,
-      "VIS_eids": [
+      "region_eids": [
         "7416f387-b302-4ca3-8daf-03b585a1b7ec",
         "7cb81727-2097-4b52-b480-c89867b5b34c"
       ],
@@ -398,7 +398,7 @@
     },
     "SWC_053": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "75b6b132-d998-4fba-8482-961418ac957d"
       ],
       "VIS_acronyms": [
@@ -411,7 +411,7 @@
   "churchlandlab": {
     "CSHL047": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "b52182e7-39f6-4914-9717-136db589706e"
       ],
       "VIS_acronyms": [
@@ -422,7 +422,7 @@
     },
     "CSHL052": {
       "n_VIS_sessions": 2,
-      "VIS_eids": [
+      "region_eids": [
         "83e77b4b-dfa0-4af9-968b-7ea0c7a0c7e4",
         "85dc2ebd-8aaf-46b0-9284-a197aee8b16f"
       ],
@@ -439,7 +439,7 @@
     },
     "CSHL054": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "a71175be-d1fd-47a3-aa93-b830ea3634a1"
       ],
       "VIS_acronyms": [
@@ -449,7 +449,7 @@
     },
     "CSHL059": {
       "n_VIS_sessions": 2,
-      "VIS_eids": [
+      "region_eids": [
         "37e96d0b-5b4b-4c6e-9b29-7edbdc94bbd0",
         "dda5fc59-f09a-4256-9fb5-66c67667a466"
       ],
@@ -465,7 +465,7 @@
     },
     "CSHL060": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "7be8fec4-406b-4e74-8548-d2885dcc3d5e"
       ],
       "VIS_acronyms": [
@@ -478,7 +478,7 @@
   "zadorlab": {
     "CSH_ZAD_011": {
       "n_VIS_sessions": 2,
-      "VIS_eids": [
+      "region_eids": [
         "03cf52f6-fba6-4743-a42e-dd1ac3072343",
         "5b44c40f-80f4-44fb-abfb-c7f19e27a6ca"
       ],
@@ -493,7 +493,7 @@
     },
     "CSH_ZAD_022": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "41431f53-69fd-4e3b-80ce-ea62e03bf9c7"
       ],
       "VIS_acronyms": [
@@ -507,7 +507,7 @@
     },
     "CSH_ZAD_025": {
       "n_VIS_sessions": 2,
-      "VIS_eids": [
+      "region_eids": [
         "6274dda8-3a59-4aa1-95f8-a8a549c46a26",
         "90c61c38-b9fd-4cc3-9795-29160d2f8e55"
       ],
@@ -522,7 +522,7 @@
     },
     "CSH_ZAD_026": {
       "n_VIS_sessions": 1,
-      "VIS_eids": [
+      "region_eids": [
         "5d01d14e-aced-4465-8f8e-9a1c674f62ec"
       ],
       "VIS_acronyms": [

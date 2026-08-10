@@ -1,0 +1,158 @@
+{
+  "cortexlab": {
+    "KS046": {
+      "target_prefix": "VISl",
+      "n_region_sessions": 1,
+      "region_eids": [
+        "69c9a415-f7fa-4208-887b-1417c1479b48"
+      ],
+      "region_acronyms": [
+        "VISl1",
+        "VISl2/3",
+        "VISl4",
+        "VISl5",
+        "VISli5",
+        "VISli6a"
+      ]
+    },
+    "KS055": {
+      "target_prefix": "VISl",
+      "n_region_sessions": 2,
+      "region_eids": [
+        "872ce8ff-9fb3-485c-be00-bc5479e0095b",
+        "b22f694e-4a34-4142-ab9d-2556c3487086"
+      ],
+      "region_acronyms": [
+        "VISl1",
+        "VISl2/3",
+        "VISl4",
+        "VISl5",
+        "VISl6a",
+        "VISli2/3",
+        "VISli4",
+        "VISli5",
+        "VISli6a"
+      ]
+    }
+  },
+  "wittenlab": {
+    "ibl_witten_25": {
+      "target_prefix": "VISl",
+      "n_region_sessions": 1,
+      "region_eids": [
+        "5285c561-80da-4563-8694-739da92e5dd0"
+      ],
+      "region_acronyms": [
+        "VISl2/3",
+        "VISl4",
+        "VISl5",
+        "VISli5",
+        "VISli6a"
+      ]
+    }
+  },
+  "steinmetzlab": {
+    "NR_0020": {
+      "target_prefix": "VISl",
+      "n_region_sessions": 1,
+      "region_eids": [
+        "d901aff5-2250-467a-b4a1-0cb9729df9e2"
+      ],
+      "region_acronyms": [
+        "VISl6a",
+        "VISl6b"
+      ]
+    }
+  },
+  "mainenlab": {
+    "ZFM-01577": {
+      "target_prefix": "VISl",
+      "n_region_sessions": 1,
+      "region_eids": [
+        "5d6aa933-4b00-4e99-ae2d-5003657592e9"
+      ],
+      "region_acronyms": [
+        "VISl5",
+        "VISl6a",
+        "VISli6a",
+        "VISli6b"
+      ]
+    }
+  },
+  "mrsicflogellab": {
+    "SWC_054": {
+      "target_prefix": "VISl",
+      "n_region_sessions": 1,
+      "region_eids": [
+        "6c6983ef-7383-4989-9183-32b1a300d17a"
+      ],
+      "region_acronyms": [
+        "VISl5",
+        "VISl6a",
+        "VISli6a",
+        "VISli6b"
+      ]
+    }
+  },
+  "zadorlab": {
+    "CSH_ZAD_029": {
+      "target_prefix": "VISl",
+      "n_region_sessions": 2,
+      "region_eids": [
+        "1ec23a70-b94b-4e9c-a0df-8c2151da3761",
+        "fcd49e34-f07b-441c-b2ac-cb8c462ec5ac"
+      ],
+      "region_acronyms": [
+        "VISl1",
+        "VISl2/3",
+        "VISl4",
+        "VISl5",
+        "VISl6a",
+        "VISl6b",
+        "VISli5",
+        "VISli6a"
+      ]
+    }
+  },
+  "angelakilab": {
+    "NYU-39": {
+      "target_prefix": "VISl",
+      "n_region_sessions": 1,
+      "region_eids": [
+        "35ed605c-1a1a-47b1-86ff-2b56144f55af"
+      ],
+      "region_acronyms": [
+        "VISl2/3",
+        "VISl4",
+        "VISl5",
+        "VISl6a",
+        "VISli6a",
+        "VISli6b"
+      ]
+    },
+    "NYU-48": {
+      "target_prefix": "VISl",
+      "n_region_sessions": 1,
+      "region_eids": [
+        "a405053a-eb13-4aa4-850c-5a337e5dc7fd"
+      ],
+      "region_acronyms": [
+        "VISl1"
+      ]
+    }
+  },
+  "danlab": {
+    "DY_009": {
+      "target_prefix": "VISl",
+      "n_region_sessions": 1,
+      "region_eids": [
+        "3c851386-e92d-4533-8d55-89a46f0e7384"
+      ],
+      "region_acronyms": [
+        "VISl5",
+        "VISl6a",
+        "VISl6b"
+      ]
+    }
+  }
+}

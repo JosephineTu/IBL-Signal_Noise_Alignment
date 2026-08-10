@@ -24,7 +24,7 @@ def build_eids_from_results(json_path: str):
         print(f"Loaded {len(results)} results from {json_path}")
         for lab_name in results.keys():
             for subject in results[lab_name].keys():
-                eids.extend(results[lab_name][subject]["VIS_eids"])
+                eids.extend(results[lab_name][subject]["region_eids"])
     return eids
 
 def load_trials(one, eid:str):
