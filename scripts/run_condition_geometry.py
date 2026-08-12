@@ -121,7 +121,9 @@ def main():
         end = start + 0.1 # try out 100 ms time window
         X, unit_ids = fr.compute_static_firing_rates(spikes, region_cluster_ids, start=start, end=end)
         X_filtered, unit_mask = fr.filter_active_units(X, eps=1e-10, min_units=5)
-
+        if X_filtered is None:
+            print(f"  Skipping eid {eid}: not enough active units after filtering")
+            continue    
         signed_contrast = ts.get_signed_contrast(trials)
         condition_masks = ts.make_condition_masks(signed_contrast, min_trials=5)
         high_mask = ts.get_high_masks(signed_contrast, min_trials=5, threshold=0.5)

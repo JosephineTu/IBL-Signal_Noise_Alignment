@@ -78,7 +78,12 @@ def filter_active_units(X, eps=1e-10, min_units=None):
         X_filtered = X[:, :, unit_mask]
     
     if min_units is not None and np.sum(unit_mask) < min_units:
-        raise RuntimeError(f"Not enough active units: {np.sum(unit_mask)} < {min_units}")
+        print(
+            f"Skipping: not enough active units "
+            f"({np.sum(unit_mask)} < {min_units})",
+            flush=True,
+        )
+        return None, unit_mask
     
     return X_filtered, unit_mask
     
