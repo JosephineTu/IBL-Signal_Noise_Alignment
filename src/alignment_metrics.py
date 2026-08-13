@@ -16,7 +16,7 @@ def compute_signal_axis(X, pos_mask, neg_mask, min_trials=5, eps=1e-12):
     # how far apart are the two means
     signal_axis = mu_pos - mu_neg
     u_sig = signal_axis / (np.linalg.norm(signal_axis) + eps)
-    return u_sig
+    return u_sig, signal_axis
 
 def noise_residuals_by_condition(X, condition_masks):
     X = np.asarray(X, float)
@@ -215,11 +215,35 @@ def compute_noise_top1_variance(
     )
     return explained_variance_ratio, top_eigenvector
 
+def compute_w_2d(u_sig, C, a, eps=1e-12, rank_tol=1e-8):
+    u_sig = np.asarray(u_sig, float)
+    C = np.asarray(C, float)
+    a = np.asarray(a, float)
+    C = enforce_sym(C)
+    a = a / (np.linalg.norm(a) + eps)
+    B = np.column_stack([u_sig, a])
+    U, singular_values, _ = np.linalg.svd(B, full_matrices=False)
+    rank = np.sum(singular_values > rank_tol)
+    if rank < 2:
+        return np.nan
+    Q = U[:, :rank]
+    C_2d = Q.T @ C @ Q
+    d_2d = Q.T @ u_sig
+    coeff = np.linalg.solve(C_2d, d_2d)
+    w_2d = Q @ coeff
+    w_2d = w_2d / (np.linalg.norm(w_2d) + eps)
+    return w_2d
+
+def compute_w_whitened(u_sig, C, eps=1e-12):
+    w_whitened = np.linalg.solve(C + eps * np.eye(C.shape[0]), u_sig)
+    w_whitened = w_whitened / (np.linalg.norm(w_whitened) + eps)
+    return w_whitened
+
 def signal_noise_alignment(X, signed_contrast, k=3, min_trials=5, eps=1e-12):
     X = np.asarray(X, float)
     high_mask = get_high_masks(signed_contrast, min_trials=min_trials)
     pos_mask, neg_mask = get_pos_neg_masks(signed_contrast, high_mask=high_mask, min_trials=min_trials)
-    u_sig = compute_signal_axis(X, pos_mask, neg_mask, min_trials=min_trials, eps=eps)
+    u_sig,_ = compute_signal_axis(X, pos_mask, neg_mask, min_trials=min_trials, eps=eps)
     condition_masks = {
         'pos': pos_mask,
         'neg': neg_mask,
@@ -238,6 +262,8 @@ def signal_noise_alignment(X, signed_contrast, k=3, min_trials=5, eps=1e-12):
     expected_random_overlap = k_eff / n_eff
     expected_random_cosine2 = 1 / n_eff
     pval, null_cosine_2 = null_signal_noise_alignment(a, u_sig, cosine2_top1)
+    w_2d = compute_w_2d(u_sig, C, a)
+    w_whitened = compute_w_whitened(u_sig, C)
     return{
         'n_pos': n_pos,
         'n_neg': n_neg,
@@ -251,6 +277,8 @@ def signal_noise_alignment(X, signed_contrast, k=3, min_trials=5, eps=1e-12):
         'u_sig': u_sig,
         'null_pval': pval,
         'null_cosine2': null_cosine_2,
+        'w_2d': w_2d,
+        'w_whitened': w_whitened,
     }
 
 def null_signal_noise_alignment(a, u_sig, cosine2_top1, n_perm=5000, seed=0):

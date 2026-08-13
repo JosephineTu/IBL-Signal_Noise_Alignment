@@ -28,91 +28,6 @@ import src.trial_selection as ts
 from src.time_bin import run_timebinned_metric
 
 
-def _single_output(full_outputs):
-    """Unwrap the one-bin result while preserving an unexpected container."""
-    if isinstance(full_outputs, (list, tuple)) and len(full_outputs) == 1:
-        return full_outputs[0]
-    return full_outputs
-
-
-def run_metric_by_bin(
-    fr_tb,
-    times,
-    *,
-    signed_contrast,
-    k,
-    min_trials,
-    min_units,
-):
-    """Run valid bins and retain invalid bins as NaN rows."""
-    n_bins = fr_tb.shape[1]
-    rows = []
-    full_outputs = [None] * n_bins
-    unit_masks = []
-    statuses = []
-    n_active_units = []
-
-    for bin_index in range(n_bins):
-        X_bin, unit_mask = fr.filter_active_units(
-            fr_tb[:, bin_index, :],
-            min_units=min_units,
-        )
-        unit_masks.append(unit_mask)
-        n_active = int(np.sum(unit_mask))
-        n_active_units.append(n_active)
-
-        if X_bin is None:
-            statuses.append("insufficient_active_units")
-            print(
-                f"  skipping bin {bin_index}: "
-                f"active units {n_active} < {min_units}",
-                flush=True,
-            )
-            continue
-
-        bin_df, bin_outputs = run_timebinned_metric(
-            X_bin[:, np.newaxis, :],
-            np.asarray([times[bin_index]], dtype=float),
-            am.signal_noise_alignment,
-            signed_contrast=signed_contrast,
-            k=k,
-            min_trials=min_trials,
-            eps=1e-12,
-        )
-        if len(bin_df) != 1:
-            raise RuntimeError(
-                "Expected one output row for one time bin, "
-                f"got {len(bin_df)} for bin {bin_index}"
-            )
-
-        bin_df = bin_df.copy()
-        bin_df["bin_index"] = bin_index
-        rows.append(bin_df)
-        full_outputs[bin_index] = _single_output(bin_outputs)
-        statuses.append("ok")
-
-    if rows:
-        time_df = (
-            pd.concat(rows, ignore_index=True)
-            .set_index("bin_index")
-            .reindex(range(n_bins))
-            .rename_axis("bin_index")
-            .reset_index()
-        )
-    else:
-        # There are no metric columns to infer, but keep one row per bin so the
-        # session and its time axis remain represented in the saved summary.
-        time_df = pd.DataFrame({"bin_index": np.arange(n_bins)})
-
-    # Assign these after reindexing so skipped bins retain their coordinates
-    # while all unavailable metric columns remain NaN.
-    time_df["time"] = np.asarray(times, dtype=float)
-    time_df["status"] = statuses
-    time_df["n_active_units"] = n_active_units
-
-    return time_df, full_outputs, unit_masks
-
-
 def run_one_eid(
     one,
     atlas,
@@ -159,13 +74,25 @@ def run_one_eid(
         time_windows,
     )
 
-    time_df, full_outputs, unit_masks = run_metric_by_bin(
+    fr_tb_filtered, unit_mask = fr.filter_active_units(
         fr_tb,
+        min_units=min_units,
+    )
+    if fr_tb_filtered is None:
+        raise RuntimeError(
+            f"Not enough active units for eid={eid}: "
+            f"{int(np.sum(unit_mask))} < {min_units}"
+        )
+
+    time_df, full_outputs = run_timebinned_metric(
+        fr_tb_filtered,
         times,
+        am.signal_noise_alignment,
+        min_units=min_units,
         signed_contrast=signed_contrast,
         k=k,
         min_trials=min_trials,
-        min_units=min_units,
+        eps=1e-12,
     )
 
     time_df.insert(0, "eid", eid)
@@ -190,15 +117,15 @@ def run_one_eid(
         "bin_tag": bin_tag,
         "time_windows": time_windows,
         "full_outputs": full_outputs,
-        "unit_masks": unit_masks,
+        "unit_mask": unit_mask,
         "unit_ids": unit_ids,
     }
 
-    n_skipped = int((time_df["status"] != "ok").sum())
     print(
         f"  finished {eid} | n_trials={fr_tb.shape[0]}, "
-        f"n_bins={fr_tb.shape[1]}, n_units={fr_tb.shape[2]}, "
-        f"skipped_bins={n_skipped}",
+        f"n_bins={fr_tb.shape[1]}, "
+        f"n_units={fr_tb.shape[2]}, "
+        f"n_active_units={int(np.sum(unit_mask))}",
         flush=True,
     )
     return time_df, details
@@ -223,9 +150,9 @@ def main():
         default="/scratch/midway3/xiaorantu/ONE",
     )
     parser.add_argument("--target-prefix", required=True)
-    parser.add_argument("--t-start", type=float, default=0.04)
-    parser.add_argument("--t-end", type=float, default=0.14)
-    parser.add_argument("--bin-size", type=float, default=0.05)
+    parser.add_argument("--t-start", type=float, default=0.0)
+    parser.add_argument("--t-end", type=float, default=0.1)
+    parser.add_argument("--bin-size", type=float, default=0.03)
     parser.add_argument("--step-size", type=float, default=0.01)
     parser.add_argument("--k", type=int, default=3)
     parser.add_argument("--min-trials", type=int, default=5)

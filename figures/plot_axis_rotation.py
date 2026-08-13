@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import pickle
+from collections.abc import Mapping
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -10,6 +11,10 @@ from sklearn.manifold import MDS
 
 
 EPS = 1e-12
+PROJECT_DIR = Path("/home/xiaorantu/signal_noise_alignment_git")
+BIN_TAG = "t0p0to0p1_bin0p03_step0p01_k3"
+RANDOM_STATE = 0
+AXIS_KEYS = ("u_sig", "noise_a", "w_2d", "w_whitened")
 
 
 def normalize_axis(vector, eps=EPS):
@@ -46,7 +51,7 @@ def embed_axis_trajectories(
     u_axes,
     noise_axes,
     w_2d_axes,
-    w_full_axes,
+    w_whitened_axes,
     random_state=0,
 ):
     """Jointly embed all four trajectories in one common MDS space."""
@@ -54,7 +59,7 @@ def embed_axis_trajectories(
         "u_coordinates": [normalize_axis(v) for v in u_axes],
         "noise_coordinates": [normalize_axis(v) for v in noise_axes],
         "w_2d_coordinates": [normalize_axis(v) for v in w_2d_axes],
-        "w_full_coordinates": [normalize_axis(v) for v in w_full_axes],
+        "w_whitened_coordinates": [normalize_axis(v) for v in w_whitened_axes],
     }
 
     lengths = {name: len(vectors) for name, vectors in groups.items()}
@@ -146,7 +151,7 @@ def plot_axis_trajectories(
     u_axes,
     noise_axes,
     w_2d_axes,
-    w_full_axes,
+    w_whitened_axes,
     eid,
     output_path,
     random_state=0,
@@ -157,14 +162,14 @@ def plot_axis_trajectories(
         u_axes=u_axes,
         noise_axes=noise_axes,
         w_2d_axes=w_2d_axes,
-        w_full_axes=w_full_axes,
+        w_whitened_axes=w_whitened_axes,
         random_state=random_state,
     )
 
     u_xyz = embedding["u_coordinates"]
     a_xyz = embedding["noise_coordinates"]
     w_2d_xyz = embedding["w_2d_coordinates"]
-    w_full_xyz = embedding["w_full_coordinates"]
+    w_whitened_xyz = embedding["w_whitened_coordinates"]
 
     fig = plt.figure(figsize=(10, 7.5))
     ax = fig.add_subplot(111, projection="3d")
@@ -201,17 +206,17 @@ def plot_axis_trajectories(
 
     plot_one_trajectory(
         ax=ax,
-        xyz=w_full_xyz,
+        xyz=w_whitened_xyz,
         times=times,
         color="tab:purple",
         marker="D",
-        label=r"$w_{\mathrm{full}}(t)$",
+        label=r"$w_{\mathrm{whitened}}(t)$",
         marker_size=62,
     )
 
     # Existing signal-noise comparison and the new decoder comparison.
     connect_matched_timepoints(ax, u_xyz, a_xyz)
-    connect_matched_timepoints(ax, w_2d_xyz, w_full_xyz)
+    connect_matched_timepoints(ax, w_2d_xyz, w_whitened_xyz)
 
     ax.text(
         u_xyz[0, 0],
@@ -248,14 +253,6 @@ def plot_axis_trajectories(
     plt.close(fig)
 
 
-def get_first_present_key(mapping, candidates):
-    """Support both the requested keys and older descriptive key names."""
-    for key in candidates:
-        if key in mapping:
-            return key
-    return None
-
-
 def axes_have_compatible_dimensions(axis_groups):
     shapes = {
         group_name: {vector.shape for vector in vectors}
@@ -274,28 +271,28 @@ def axes_have_compatible_dimensions(axis_groups):
 
 def main():
     parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "--details-pkl",
-        default=(
-            "results/timebinned_alignment/"
-            "t0p0to0p1_bin0p03_step0p01_k3"
-            "_timebinned_alignment_details.pkl"
-        ),
-    )
-    parser.add_argument(
-        "--output-dir",
-        default="figures/axis_rotation_with_decoders",
-    )
-    parser.add_argument(
-        "--random-state",
-        type=int,
-        default=0,
-    )
-
+    parser.add_argument("--target-prefix", required=True)
     args = parser.parse_args()
-    details_pkl = Path(args.details_pkl)
-    output_dir = Path(args.output_dir)
+
+    target_prefix = args.target_prefix.strip()
+    if not target_prefix:
+        parser.error("--target-prefix cannot be empty")
+
+    details_pkl = (
+        PROJECT_DIR
+        / "results"
+        / "timebinned_alignment"
+        / target_prefix
+        / f"{BIN_TAG}_timebinned_alignment_details.pkl"
+    )
+    output_dir = (
+        PROJECT_DIR
+        / "figures"
+        / "axis_rotation_with_decoders"
+        / target_prefix
+    )
+    if not details_pkl.is_file():
+        raise FileNotFoundError(f"Details PKL not found: {details_pkl}")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Loading details from {details_pkl}")
@@ -320,17 +317,29 @@ def main():
             dtype=float,
         )
         full_outputs = session_details["full_outputs"]
-        bin_keys = sorted(full_outputs.keys(), key=lambda key: int(key))
+        if isinstance(full_outputs, Mapping):
+            bin_items = sorted(
+                full_outputs.items(),
+                key=lambda item: int(item[0]),
+            )
+        else:
+            bin_items = enumerate(full_outputs)
 
         times = []
         u_axes = []
         noise_axes = []
         w_2d_axes = []
-        w_full_axes = []
+        w_whitened_axes = []
 
-        for bin_key in bin_keys:
-            output = full_outputs[bin_key]
+        for bin_key, output in bin_items:
             bin_idx = int(bin_key)
+
+            if output is None:
+                print(
+                    f"Skipping eid={eid}, bin={bin_key}: "
+                    "no output for this time bin"
+                )
+                continue
 
             if not 0 <= bin_idx < len(time_windows):
                 print(
@@ -339,24 +348,7 @@ def main():
                 )
                 continue
 
-            w_2d_key = get_first_present_key(
-                output,
-                ("w_2D", "w_2d", "decoder_w_2d_eff"),
-            )
-            w_full_key = get_first_present_key(
-                output,
-                ("w_full", "decoder_w_full"),
-            )
-
-            missing = []
-            if "u_sig" not in output:
-                missing.append("u_sig")
-            if "noise_a" not in output:
-                missing.append("noise_a")
-            if w_2d_key is None:
-                missing.append("w_2D")
-            if w_full_key is None:
-                missing.append("w_full")
+            missing = [key for key in AXIS_KEYS if key not in output]
 
             if missing:
                 print(
@@ -368,8 +360,8 @@ def main():
             candidate_axes = {
                 "u_sig": np.asarray(output["u_sig"], dtype=float),
                 "noise_a": np.asarray(output["noise_a"], dtype=float),
-                "w_2D": np.asarray(output[w_2d_key], dtype=float),
-                "w_full": np.asarray(output[w_full_key], dtype=float),
+                "w_2d": np.asarray(output["w_2d"], dtype=float),
+                "w_whitened": np.asarray(output["w_whitened"], dtype=float),
             }
 
             try:
@@ -386,8 +378,8 @@ def main():
             times.append(float(np.mean(time_windows[bin_idx])))
             u_axes.append(candidate_axes["u_sig"])
             noise_axes.append(candidate_axes["noise_a"])
-            w_2d_axes.append(candidate_axes["w_2D"])
-            w_full_axes.append(candidate_axes["w_full"])
+            w_2d_axes.append(candidate_axes["w_2d"])
+            w_whitened_axes.append(candidate_axes["w_whitened"])
 
         if len(times) < 2:
             print(f"Skipping {eid}: fewer than two valid bins")
@@ -396,8 +388,8 @@ def main():
         axis_groups = {
             "u_sig": u_axes,
             "noise_a": noise_axes,
-            "w_2D": w_2d_axes,
-            "w_full": w_full_axes,
+            "w_2d": w_2d_axes,
+            "w_whitened": w_whitened_axes,
         }
         compatible, shapes = axes_have_compatible_dimensions(axis_groups)
         if not compatible:
@@ -422,10 +414,10 @@ def main():
             u_axes=u_axes,
             noise_axes=noise_axes,
             w_2d_axes=w_2d_axes,
-            w_full_axes=w_full_axes,
+            w_whitened_axes=w_whitened_axes,
             eid=eid,
             output_path=output_path,
-            random_state=args.random_state,
+            random_state=RANDOM_STATE,
         )
 
     print(f"Saved plots to {output_dir}")

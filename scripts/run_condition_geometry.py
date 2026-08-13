@@ -17,7 +17,7 @@ from iblatlas.atlas import AllenAtlas
 
 def signal_manifold_overlap(X, condition_masks, pos_mask, neg_mask, n_components=3):
     components, explained_variance_ratio = am.compute_condition_mean_pca(X, condition_masks, n_components=n_components)
-    u_sig = am.compute_signal_axis(X, pos_mask, neg_mask, min_trials=5, eps=1e-12)
+    u_sig,_ = am.compute_signal_axis(X, pos_mask, neg_mask, min_trials=5, eps=1e-12)
     overlap_by_k = {}
     U = components.T
     for k in range(1, U.shape[1]+1):
