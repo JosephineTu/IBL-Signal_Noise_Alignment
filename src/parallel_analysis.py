@@ -1,3 +1,4 @@
+# parallel_analysis.py
 import numpy as np
 from alignment_metrics import compute_noise_covariance, get_eigenspectrum
 

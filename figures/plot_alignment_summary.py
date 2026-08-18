@@ -164,7 +164,7 @@ def plot_alignment_improvement(df, output_path, target_prefix, bin_tag):
         "(observed cos² − permutation-null mean)"
     )
     ax.set_title(
-        "Signal–noise alignment improvement by session\n"
+        "Excess alignment over permutation null\n"
         f"{target_prefix} | {bin_tag}"
     )
     ax.legend(
