@@ -138,6 +138,138 @@
       "region_acronyms": [
         "VISam2/3"
       ]
+    },
+    "UCLA033": {
+      "target_prefix": "VISam",
+      "n_region_sessions": 1,
+      "region_eids": [
+        "111c1762-7908-47e0-9f40-2f2ee55b6505"
+      ],
+      "region_acronyms": [
+        "VISam5",
+        "VISam6a",
+        "VISam6b"
+      ]
+    },
+    "UCLA036": {
+      "target_prefix": "VISam",
+      "n_region_sessions": 1,
+      "region_eids": [
+        "e2b845a1-e313-4a08-bc61-a5f662ed295e"
+      ],
+      "region_acronyms": [
+        "VISam1",
+        "VISam2/3",
+        "VISam4",
+        "VISam5",
+        "VISam6a",
+        "VISam6b"
+      ]
+    },
+    "UCLA052": {
+      "target_prefix": "VISam",
+      "n_region_sessions": 1,
+      "region_eids": [
+        "687017d4-c9fc-458f-a7d5-0979fe1a7470"
+      ],
+      "region_acronyms": [
+        "VISam2/3",
+        "VISam4",
+        "VISam5",
+        "VISam6a",
+        "VISam6b"
+      ]
+    }
+  },
+  "churchlandlab": {
+    "CSHL047": {
+      "target_prefix": "VISam",
+      "n_region_sessions": 1,
+      "region_eids": [
+        "b52182e7-39f6-4914-9717-136db589706e"
+      ],
+      "region_acronyms": [
+        "VISam1",
+        "VISam2/3",
+        "VISam4",
+        "VISam5"
+      ]
+    },
+    "CSHL049": {
+      "target_prefix": "VISam",
+      "n_region_sessions": 1,
+      "region_eids": [
+        "4b7fbad4-f6de-43b4-9b15-c7c7ef44db4b"
+      ],
+      "region_acronyms": [
+        "VISam2/3",
+        "VISam4",
+        "VISam5",
+        "VISam6a"
+      ]
+    },
+    "CSHL051": {
+      "target_prefix": "VISam",
+      "n_region_sessions": 1,
+      "region_eids": [
+        "ecb5520d-1358-434c-95ec-93687ecd1396"
+      ],
+      "region_acronyms": [
+        "VISam6a",
+        "VISam6b"
+      ]
+    },
+    "CSHL058": {
+      "target_prefix": "VISam",
+      "n_region_sessions": 1,
+      "region_eids": [
+        "f312aaec-3b6f-44b3-86b4-3a0c119c0438"
+      ],
+      "region_acronyms": [
+        "VISam5"
+      ]
+    },
+    "CSHL059": {
+      "target_prefix": "VISam",
+      "n_region_sessions": 1,
+      "region_eids": [
+        "dda5fc59-f09a-4256-9fb5-66c67667a466"
+      ],
+      "region_acronyms": [
+        "VISam1",
+        "VISam2/3",
+        "VISam4",
+        "VISam6b"
+      ]
+    }
+  },
+  "zadorlab": {
+    "CSH_ZAD_019": {
+      "target_prefix": "VISam",
+      "n_region_sessions": 1,
+      "region_eids": [
+        "7f6b86f9-879a-4ea2-8531-294a221af5d0"
+      ],
+      "region_acronyms": [
+        "VISam6a",
+        "VISam6b"
+      ]
+    },
+    "CSH_ZAD_022": {
+      "target_prefix": "VISam",
+      "n_region_sessions": 2,
+      "region_eids": [
+        "6a601cc5-7b79-4c75-b0e8-552246532f82",
+        "a82800ce-f4e3-4464-9b80-4c3d6fade333"
+      ],
+      "region_acronyms": [
+        "VISam1",
+        "VISam2/3",
+        "VISam4",
+        "VISam5",
+        "VISam6a",
+        "VISam6b"
+      ]
     }
   }
 }

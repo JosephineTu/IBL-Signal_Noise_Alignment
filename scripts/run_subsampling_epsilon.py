@@ -58,6 +58,31 @@ N_SPLITS = 5
 ONE_CACHE_DIR = "/scratch/midway3/xiaorantu/ONE"
 
 
+def neuron_wise_trial_shuffle(X, rng):
+    """
+    Independently permutes the trial (row) order of EACH neuron (column)
+    of X. After this, for any given trial position, the population
+    vector is an arbitrary combination of different neurons' unrelated
+    trials -- both that neuron's tuning to the trial's real contrast AND
+    any cross-neuron noise correlation are destroyed, while each
+    neuron's own marginal distribution of firing rates across trials is
+    preserved exactly (same values, just reassigned to different trial
+    positions, independently per neuron).
+
+    Trial POSITIONS are unchanged (X_shuffled has the same shape/order as
+    X), so the real signed_contrast / masks can be reused as-is against
+    X_shuffled without any relabeling -- each trial position still gets
+    its real contrast label, it's just paired with a fabricated
+    population vector instead of the real one.
+    """
+    n_trials, n_neurons = X.shape
+    X_shuffled = np.empty_like(X)
+    for j in range(n_neurons):
+        perm = rng.permutation(n_trials)
+        X_shuffled[:, j] = X[perm, j]
+    return X_shuffled
+
+
 def run_one_session_epsilon(
     one, atlas, eid, target_prefix, k=K, n_min=N_MIN, seed=SEED, n_splits=N_SPLITS
 ):
@@ -86,6 +111,7 @@ def run_one_session_epsilon(
         "eid": eid,
         "pid": loaded["pid"],
         "target_prefix": target_prefix,
+        "shuffle": "none",
         "seed": seed,
         "k": k,
         "n_min": n_min,
@@ -114,6 +140,88 @@ def run_one_session_epsilon(
         "eid": eid,
         "pid": loaded["pid"],
         "target_prefix": target_prefix,
+        "shuffle": "none",
+        "status": "ok",
+        "error": "",
+        "n_total_units": int(n_total),
+        "n_grid_points": fit["n_points"],
+        "epsilon": fit["intercept"],
+        "se_intercept": fit["se_intercept"],
+        "p_value": fit["p_value"],
+        "slope": fit["slope"],
+    }
+    return summary, details
+
+
+def run_one_session_epsilon_shuffled(
+    one, atlas, eid, target_prefix, k=K, n_min=N_MIN, seed=SEED, n_splits=N_SPLITS
+):
+    """
+    Same as run_one_session_epsilon, but computed on a neuron-wise
+    trial-shuffled pseudo-X (see neuron_wise_trial_shuffle) instead of
+    the real X. Everything downstream of X -- masks, log_spaced_neuron_
+    counts, get_test_mse_cv, fit_information_limiting_intercept -- is the
+    identical, unmodified real pipeline; only the input X differs.
+
+    ONE shuffle realization is drawn per session (seeded from `seed`,
+    same convention as everywhere else in this script) and reused across
+    all N / all repeats inside get_test_mse_cv -- mirroring how the real
+    epsilon is computed from one fixed real X, not re-shuffled per
+    repeat. If you want the shuffle-realization variance itself
+    quantified (multiple independent shuffles per session, averaged),
+    that's a straightforward follow-up (loop this over several
+    shuffle seeds) -- not done here since it wasn't asked for.
+    """
+    loaded = load_session_0_100ms(
+        one=one,
+        atlas=atlas,
+        eid=eid,
+        target_prefix=target_prefix,
+    )
+    X_real = loaded["X"]
+    n_total = X_real.shape[1]
+
+    shuffle_rng = np.random.default_rng(seed)
+    X = neuron_wise_trial_shuffle(X_real, shuffle_rng)
+
+    masks = make_contrast_masks(loaded["signed_contrast"])
+    ints = log_spaced_neuron_counts(n_total, k=k, n_min=n_min)
+
+    model = RidgeCV(alphas=RIDGE_ALPHAS, fit_intercept=True, cv=None)
+    mse_results, mse_std_results = get_test_mse_cv(
+        X, ints, masks, model, seed, num_samples=NUM_SAMPLES, n_splits=n_splits
+    )
+
+    fit = fit_information_limiting_intercept(
+        mse_results, mse_std_results, num_samples=NUM_SAMPLES
+    )
+
+    details = {
+        "eid": eid,
+        "pid": loaded["pid"],
+        "target_prefix": target_prefix,
+        "shuffle": "neuron_wise_trial",
+        "seed": seed,
+        "k": k,
+        "n_min": n_min,
+        "num_samples": NUM_SAMPLES,
+        "n_splits": n_splits,
+        "n_total_units": int(n_total),
+        "n_grid": ints,
+        "mse_results": mse_results,
+        "mse_std_results": mse_std_results,
+        "epsilon": fit["intercept"],
+        "slope": fit["slope"],
+        "se_intercept": fit["se_intercept"],
+        "p_value": fit["p_value"],
+        "n_points": fit["n_points"],
+    }
+
+    summary = {
+        "eid": eid,
+        "pid": loaded["pid"],
+        "target_prefix": target_prefix,
+        "shuffle": "neuron_wise_trial",
         "status": "ok",
         "error": "",
         "n_total_units": int(n_total),
@@ -130,6 +238,7 @@ SUMMARY_FIELDS = [
     "eid",
     "pid",
     "target_prefix",
+    "shuffle",
     "status",
     "error",
     "n_total_units",
@@ -158,6 +267,14 @@ def parse_args():
     parser.add_argument("--n-splits", type=int, default=N_SPLITS)
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--output-dir", default=None)
+    parser.add_argument(
+        "--shuffle", action="store_true",
+        help="compute epsilon on a neuron-wise trial-shuffled null "
+             "(destroys tuning AND noise correlations) instead of the "
+             "real data. Writes to a separate output dir by default "
+             "(results/subsampling_epsilon_shuffled/<target_prefix>/) so "
+             "it never overwrites real results.",
+    )
     return parser.parse_args()
 
 
@@ -171,16 +288,18 @@ def main():
         / args.target_prefix
         / f"{args.target_prefix}_subjects_by_lab.json"
     )
-    output_dir = (
-        Path(args.output_dir).resolve()
-        if args.output_dir
-        else REPO_ROOT / "results" / "subsampling_epsilon" / args.target_prefix
-    )
+    if args.output_dir:
+        output_dir = Path(args.output_dir).resolve()
+    elif args.shuffle:
+        output_dir = REPO_ROOT / "results" / "subsampling_epsilon_shuffled" / args.target_prefix
+    else:
+        output_dir = REPO_ROOT / "results" / "subsampling_epsilon" / args.target_prefix
     details_dir = output_dir / "details"
     output_dir.mkdir(parents=True, exist_ok=True)
     details_dir.mkdir(parents=True, exist_ok=True)
+    suffix = "shuffled" if args.shuffle else "epsilon"
     summary_path = (
-        output_dir / f"{args.target_prefix}_subsampling_epsilon_summary.csv"
+        output_dir / f"{args.target_prefix}_subsampling_{suffix}_summary.csv"
     )
 
     eids = build_eids(input_json)
@@ -188,6 +307,7 @@ def main():
     print(f"input_json={input_json}")
     print(f"n_sessions={len(eids)}")
     print(f"output_dir={output_dir}")
+    print(f"shuffle={args.shuffle}")
     print(
         f"k={args.k} n_min={args.n_min} num_samples={NUM_SAMPLES} "
         f"n_splits={args.n_splits} seed={args.seed}"
@@ -201,11 +321,13 @@ def main():
     )
     atlas = AllenAtlas()
 
+    run_fn = run_one_session_epsilon_shuffled if args.shuffle else run_one_session_epsilon
+
     rows = []
     for session_index, eid in enumerate(eids, start=1):
         print(f"[{session_index}/{len(eids)}] eid={eid}")
         try:
-            summary, details = run_one_session_epsilon(
+            summary, details = run_fn(
                 one=one,
                 atlas=atlas,
                 eid=eid,
@@ -215,7 +337,7 @@ def main():
                 seed=args.seed,
                 n_splits=args.n_splits,
             )
-            details_path = details_dir / f"{eid}_subsampling_epsilon.pkl"
+            details_path = details_dir / f"{eid}_subsampling_{suffix}.pkl"
             with open(details_path, "wb") as f:
                 pickle.dump(details, f)
             print(
@@ -229,6 +351,7 @@ def main():
                 "eid": eid,
                 "pid": "",
                 "target_prefix": args.target_prefix,
+                "shuffle": "neuron_wise_trial" if args.shuffle else "none",
                 "status": "failed",
                 "error": repr(exc),
                 "n_total_units": "",
